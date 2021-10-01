@@ -1,6 +1,5 @@
 from transformers import BeitModel, BeitFeatureExtractor
 from torch import nn
-from torchsummary import summary
 
 import matplotlib.pyplot as plt
 
@@ -45,7 +44,6 @@ class Decoder2D(nn.Module):
         self.final_out = nn.Conv2d(features[-1], out_channels, 3, padding=1)
 
     def forward(self, x):
-        print(x.shape)
         x = self.decoder_1(x)
         x = self.decoder_2(x)
         x = self.decoder_3(x)
@@ -57,14 +55,18 @@ class BeitSegmentationModel(nn.Module):
 
     def __init__(
         self,
-        img_size,
-        patch_dim,
-        num_channels,
-        num_classes,
-        pretrained_model):
+        lr=0.001,
+        momentum=0.9,
+        img_size=224,
+        patch_dim=16,
+        num_channels=3,
+        num_classes=1,
+        pretrained_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
 
         super(BeitSegmentationModel, self).__init__()
 
+        self.lr = lr
+        self.momentum = momentum
         self.img_size = img_size
         self.patch_dim = patch_dim
         self.num_channels = num_channels
@@ -96,9 +98,6 @@ class BeitSegmentationModel(nn.Module):
         return pooler_output
 
     def forward(self, x):
-
-        print(type(x))
-
         self.batch_size = len(x)
         
         encoder_pooler = self.encode(x)

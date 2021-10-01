@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.lib.utils import source
 from torch.utils.data import Dataset
+from matplotlib import cm
+from PIL import Image
 
 from sklearn.feature_extraction.image import extract_patches_2d
 
@@ -29,6 +31,15 @@ def get_image_paths(data_dir):
     
     return source_image_paths, target_image_paths
 
+def get_dataset(data_type):
+    if data_type == "training":
+        return AerialImages(training_data_dir)
+    elif data_type == "test":
+        return AerialImages(test_data_dir)
+    elif data_type == "validation":
+        return AerialImages(validation_data_dir)
+    else:
+        raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
 
 class AerialImages(Dataset):
     def __init__(self, data_dir, transform=None):
@@ -57,16 +68,19 @@ class AerialImages(Dataset):
             x_patches += 1
 
         # Batchsize, patch_size, patch_size, channels
-        source_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 3), dtype=np.int64)
-        target_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 3), dtype=np.int64)
+        source_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 3), dtype=np.int32)
+        target_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 1), dtype=np.int32)
+
 
         for y in range(y_patches):
             for x in range(x_patches):
                 source_patch = np.zeros((patch_size[0], patch_size[1], 3))
-                target_patch = np.zeros((patch_size[0], patch_size[1], 3))
+                target_patch = np.zeros((patch_size[0], patch_size[1], 1))
 
                 temp_source_patch = source_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
                 temp_target_patch = target_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
+
+                temp_target_patch = np.amax(temp_target_patch, axis=2).reshape(temp_target_patch.shape[0], temp_target_patch.shape[1], 1)
 
                 if temp_source_patch.shape[0] != patch_size[0] or temp_source_patch.shape[1] != patch_size[1]:
                     source_patch[:temp_source_patch.shape[0], :temp_source_patch.shape[1]] = temp_source_patch
@@ -78,6 +92,10 @@ class AerialImages(Dataset):
                 source_patches[y, x] = source_patch
                 target_patches[y, x] = target_patch
 
+        source_patches = source_patches.reshape((source_patches.shape[0] * source_patches.shape[1]), source_patches.shape[2], source_patches.shape[3], source_patches.shape[4])
+        target_patches = target_patches.reshape((target_patches.shape[0] * target_patches.shape[1]), target_patches.shape[2], target_patches.shape[3], target_patches.shape[4])
+
+        source_patches = [Image.fromarray(np.uint8(arr)) for arr in source_patches]
 
         return source_patches, target_patches
 
@@ -89,12 +107,6 @@ class AerialImages(Dataset):
         
         source_image = cv.imread(self.source_image_paths[idx])
         target_image = cv.imread(self.target_image_paths[idx])
-
-        print(self.source_image_paths[idx])
-        print(self.target_image_paths[idx])
-
-        print(target_image)
-        print(source_image)
 
         source_patches, target_patches = self._get_image_patches(source_image, target_image, (224, 224))
 
@@ -109,11 +121,8 @@ if __name__ == "__main__":
     source_img, target_img = data[0]
 
     f, axarr = plt.subplots(1, 2)
-    axarr[0].imshow(source_img[0, -1])
-    axarr[1].imshow(target_img[0, -1])
+    
+    axarr[0].imshow(source_img[-1])
+    axarr[1].imshow(target_img[-1])
+
     plt.show()
-    #image = cv.imread("./data/tiff/train/22678915_15.tiff")
-
-    #print(image.shape)
-
-    #patches = extract_patches_2d(image, (224, 224))
