@@ -2,6 +2,8 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from PIL import Image
 
 from data_generator import get_dataset
 from beit_seg import BeitSegmentationModel
@@ -9,13 +11,12 @@ from beit_seg import BeitSegmentationModel
 def train(model):
 
     training_data = get_dataset("training")
-
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
     # Training loop
 
-    n_epochs = 1
+    n_epochs = 10
 
     running_loss = 0
     for _, epoch in tqdm(enumerate(range(n_epochs)), desc="Training loop", total=n_epochs):
@@ -39,9 +40,25 @@ def train(model):
 
     print("Finished training")
 
+    return model
+
 
 if __name__ == "__main__":
 
     model = BeitSegmentationModel(lr=0.00001)
 
-    train(model)
+    model = train(model)
+
+    test_data = get_dataset("test")
+
+    source_images, target_images = test_data[0]
+
+    output_images = model(source_images)
+
+    f, axarr = plt.subplots(1, 2)
+    
+    axarr[0].imshow(output_images[0])
+    axarr[1].imshow(target_images[0])
+    
+    plt.show()
+

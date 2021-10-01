@@ -4,16 +4,17 @@ from numpy.lib.utils import source
 from torch.utils.data import Dataset
 from matplotlib import cm
 from PIL import Image
+import cv2 as cv
 
 from sklearn.feature_extraction.image import extract_patches_2d
 
 import os
-import cv2 as cv
+import random
 
 main_dir = "./data/tiff"
 
 training_data_dir = [main_dir + "/train", main_dir + "/train_labels"]
-test_data_dir = [main_dir + "/test", main_dir + "test_labels"]
+test_data_dir = [main_dir + "/test", main_dir + "/test_labels"]
 validation_data_dir = [main_dir + "/val", main_dir + "/val_labels"]
 
 def get_image_paths(data_dir):
@@ -42,8 +43,19 @@ def get_dataset(data_type):
         raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
 
 class AerialImages(Dataset):
-    def __init__(self, data_dir, transform=None):
+    def __init__(self, data_dir, data_percentage=1.0, transform=None):
         self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
+
+        combined_paths = list(zip(self.source_image_paths, self.target_image_paths))
+
+        random.shuffle(combined_paths)
+
+        self.source_image_paths, self.target_image_paths = zip(*combined_paths)
+
+        self.source_image_paths = self.source_image_paths[:int(len(self.source_image_paths) * data_percentage)]
+        self.target_image_paths = self.target_image_paths[:int(len(self.target_image_paths) * data_percentage)]
+
+        # TODO: Maybe reduce the batch_size, if possible?
 
         self.transform = transform
 
