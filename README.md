@@ -1,4 +1,5 @@
-
+# Building Segmentation
+Building segmentation in cooperation with the KartAi research project. This repository will explore BEiT and a multi-scale model to be used for building segmentation from orthophotos.
 
 ## Dataset
 
