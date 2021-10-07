@@ -118,16 +118,10 @@ class AerialImages(Dataset):
 
     def __getitem__(self, idx):
 
-        start = time.time()
-        
         source_image = cv.imread(self.source_image_paths[idx])
         target_image = cv.imread(self.target_image_paths[idx])
 
         source_patches, target_patches = self._get_image_patches(source_image, target_image, (224, 224))
-
-        end = time.time()
-
-        print("Elapsed time:", end - start)
 
         return source_patches, target_patches
         

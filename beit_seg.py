@@ -45,17 +45,12 @@ class Decoder2D(nn.Module):
         self.final_out = nn.Conv2d(features[-1], out_channels, 3, padding=1)
 
     def forward(self, x):
-        start = time.time()
-
         x = self.decoder_1(x)
         x = self.decoder_2(x)
         x = self.decoder_3(x)
         x = self.decoder_4(x)
         x = self.final_out(x)
 
-        end = time.time()
-
-        print("Forward time:", end - start)
         return x
 
 class BeitSegmentationModel(nn.Module):
