@@ -3,7 +3,6 @@ import torch.optim as optim
 import torch.nn as nn
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from torchsummary import summary
 
 from data_generator import get_dataset
 from beit_seg import BeitSegmentationModel
