@@ -6,10 +6,9 @@ from matplotlib import cm
 from PIL import Image
 import cv2 as cv
 
-from sklearn.feature_extraction.image import extract_patches_2d
-
 import os
 import random
+import time
 
 main_dir = "./data/tiff"
 
@@ -65,11 +64,12 @@ class AerialImages(Dataset):
             for each of the 1500x1500 images in the dataset.
         """
 
+
         img_h, img_w = source_image.shape[0], source_image.shape[1]
         patch_h, patch_w = patch_size[0], patch_size[1]
 
         y_patches = img_h // patch_h
-        x_patches = img_w // patch_h
+        x_patches = img_w // patch_w
 
         if img_h % patch_h != 0:
             y_patches += 1
@@ -77,16 +77,17 @@ class AerialImages(Dataset):
         if img_w % patch_w != 0:
             x_patches += 1
 
-        # Batchsize, patch_size, patch_size, channels
+        # y, x, patch_size, patch_size, channels ---> [7, 7, 224, 224, 3/1]
+        # a = [2, 2, 2]
         source_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 3), dtype=np.int32)
         target_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 1), dtype=np.int32)
 
 
         for y in range(y_patches):
             for x in range(x_patches):
-                source_patch = np.zeros((patch_size[0], patch_size[1], 3))
+                source_patch = np.full((patch_size[0], patch_size[1], 3), (255, 102, 255))
                 target_patch = np.zeros((patch_size[0], patch_size[1], 1))
-
+                #                               0 * 224 = 0 : (0 + 1) * 224 = 224
                 temp_source_patch = source_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
                 temp_target_patch = target_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
 
@@ -107,6 +108,8 @@ class AerialImages(Dataset):
 
         source_patches = [Image.fromarray(np.uint8(arr)) for arr in source_patches]
 
+
+
         return source_patches, target_patches
 
 
@@ -114,17 +117,28 @@ class AerialImages(Dataset):
         return len(self.source_image_paths)
 
     def __getitem__(self, idx):
+
+        start = time.time()
         
         source_image = cv.imread(self.source_image_paths[idx])
         target_image = cv.imread(self.target_image_paths[idx])
 
         source_patches, target_patches = self._get_image_patches(source_image, target_image, (224, 224))
 
+        end = time.time()
+
+        print("Elapsed time:", end - start)
+
         return source_patches, target_patches
         
 
 
 if __name__ == "__main__":
+
+
+    print(1500//224)
+    print(1500 % 224)
+    print(15//5)
 
     data = AerialImages(training_data_dir)
 
