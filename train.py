@@ -10,7 +10,7 @@ from beit_seg import BeitSegmentationModel
 
 def train(model):
 
-    training_data = get_dataset("training")
+    training_data = get_dataset("training", data_percentage=0.2)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 

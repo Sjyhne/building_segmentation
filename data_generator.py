@@ -22,8 +22,6 @@ def get_image_paths(data_dir):
 
     assert len(os.listdir(source_image_dir)) == len(os.listdir(target_image_dir))
     
-    print("Number of images:", len(os.listdir(source_image_dir)))
-
     source_image_paths, target_image_paths = [], []
 
     for file in sorted(os.listdir(source_image_dir)):
@@ -32,13 +30,13 @@ def get_image_paths(data_dir):
     
     return source_image_paths, target_image_paths
 
-def get_dataset(data_type):
+def get_dataset(data_type, data_percentage=1.0):
     if data_type == "training":
-        return AerialImages(training_data_dir)
+        return AerialImages(training_data_dir, data_percentage)
     elif data_type == "test":
-        return AerialImages(test_data_dir)
+        return AerialImages(test_data_dir, data_percentage)
     elif data_type == "validation":
-        return AerialImages(validation_data_dir)
+        return AerialImages(validation_data_dir, data_percentage)
     else:
         raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
 
