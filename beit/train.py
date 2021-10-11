@@ -1,3 +1,9 @@
+import sys
+import os.path
+from numpy.lib.utils import source
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -8,29 +14,36 @@ from data_generator import get_dataset
 from beit_seg import BeitSegmentationModel
 from metrics import IoU
 
-def train(model):
+def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=0.3)
+
+
+    training_data = get_dataset("validation", data_percentage=1.0)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
     # Training loop
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("Using:", device)
+
     n_epochs = 3
+
+    model = model.to(device)
 
     running_loss = 0
     for _, epoch in tqdm(enumerate(range(n_epochs)), desc="Training loop", total=n_epochs):
         for i in range(len(training_data)):
             source_images, target_images = training_data[i]
 
-            source_images = source_images
-            target_images = torch.tensor(target_images).float()
+            s_images = source_images.double().to(device)
+            t_images = target_images.double().to(device)
 
             optimizer.zero_grad()
 
-            output_images = model(source_images)
+            output_images = model(s_images)
 
-            loss = criterion(output_images, target_images)
+            loss = criterion(output_images, t_images)
             loss.backward()
             optimizer.step()
 
@@ -40,8 +53,8 @@ def train(model):
             running_iou_7 = 0
 
             for i in range(len(source_images)):
-                running_iou_5 += IoU(output_images[i].detach().numpy(), target_images[i].detach().numpy(), 0.5)
-                running_iou_7 += IoU(output_images[i].detach().numpy(), target_images[i].detach().numpy(), 0.7)
+                running_iou_5 += IoU(output_images[i].detach().numpy(), t_images[i].detach().numpy(), 0.5)
+                running_iou_7 += IoU(output_images[i].detach().numpy(), t_images[i].detach().numpy(), 0.7)
 
             iou_5 = running_iou_5 / len(output_images)
             iou_7 = running_iou_7 / len(output_images)
@@ -58,6 +71,7 @@ if __name__ == "__main__":
 
     model = BeitSegmentationModel(lr=0.00001)
 
+    model = model.double()
     model = train(model)
 
     test_data = get_dataset("test")

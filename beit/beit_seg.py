@@ -78,7 +78,8 @@ class BeitSegmentationModel(nn.Module):
         # alter some of the default values used
         self.beit_base = BeitModel.from_pretrained(pretrained_model)
 
-        self.beit_feature_extractor = BeitFeatureExtractor()
+        # TODO: Do this before the training loop is done, will save time, and memory?
+        self.beit_feature_extractor = BeitFeatureExtractor.from_pretrained(pretrained_model)
 
         self.decoder = Decoder2D(self.num_channels, self.num_classes)
 
@@ -91,15 +92,15 @@ class BeitSegmentationModel(nn.Module):
             * hidden_states
             * attentions
         """
-        pixel_values = self.beit_feature_extractor(x, "pt")
 
-        encoder_output = self.beit_base(**pixel_values)        
+        encoder_output = self.beit_base(pixel_values=x)        
         
         pooler_output = encoder_output.pooler_output.reshape(self.batch_size, self.num_channels, self.patch_dim, self.patch_dim)
 
         return pooler_output
 
     def forward(self, x):
+
         self.batch_size = len(x)
         
         encoder_pooler = self.encode(x)

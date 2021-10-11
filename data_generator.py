@@ -1,14 +1,20 @@
+from re import S
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2 as cv
+import torch
+
 from numpy.lib.utils import source
 from torch.utils.data import Dataset
 from matplotlib import cm
 from PIL import Image
-import cv2 as cv
+from transformers import BeitFeatureExtractor
+from tqdm import tqdm
 
 import os
 import random
 import time
+import shutil
 
 main_dir = "./data/tiff"
 
@@ -31,30 +37,108 @@ def get_image_paths(data_dir):
 
 def get_dataset(data_type, data_percentage=1.0):
     if data_type == "training":
-        return AerialImages(training_data_dir, data_percentage)
+        return AerialImages(training_data_dir, data_type, data_percentage)
     elif data_type == "test":
-        return AerialImages(test_data_dir, data_percentage)
+        return AerialImages(test_data_dir, data_type, data_percentage)
     elif data_type == "validation":
-        return AerialImages(validation_data_dir, data_percentage)
+        return AerialImages(validation_data_dir, data_type, data_percentage)
     else:
         raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
+    
+
 
 class AerialImages(Dataset):
-    def __init__(self, data_dir, data_percentage=1.0, transform=None):
+    def __init__(self, data_dir, data_type, data_percentage=1.0, transform=None, patch_size=(224, 224), batch_size=16, feature_extractor_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
+        self.transform = transform
+
+        self.patch_size = patch_size
+        self.batch_size = batch_size
+
         self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
 
-        combined_paths = list(zip(self.source_image_paths, self.target_image_paths))
+        self.feature_paths, self.label_paths = self._get_features(self.source_image_paths, self.target_image_paths, data_type, feature_extractor_model, data_percentage)
+
+        # Todo: Create bacthes
+        self.batch_feature_paths = []
+        self.batch_label_paths = []
+
+        div, mod = divmod(len(self.feature_paths), self.batch_size)
+        if mod != 0:
+            div += 1
+
+        for i in range(div):
+            self.batch_feature_paths.append(self.feature_paths[i * self.batch_size:(i + 1) * self.batch_size])
+            self.batch_label_paths.append(self.label_paths[i * self.batch_size:(i + 1)*self.batch_size])
+        
+        print(self.batch_feature_paths[0])
+        print(self.batch_label_paths[0])
+    
+    def _get_features(self, source_image_paths, target_image_paths, data_type, feature_extractor_model, data_percentage):
+        fe = BeitFeatureExtractor.from_pretrained(feature_extractor_model, do_resize=False, do_center_crop=False)
+
+        all_features = []
+        all_labels = []
+
+        all_features_images = []
+        all_labels_images = []
+
+        target_dir = os.path.join("./features", feature_extractor_model, data_type)
+        feature_dir = os.path.join(target_dir, "features")
+        label_dir = os.path.join(target_dir, "labels")
+
+        #shutil.rmtree(target_dir)
+        
+        # if not "./features/model.../train"
+        if not os.path.exists(os.path.join(target_dir)):
+            os.mkdir(target_dir)
+            os.mkdir(feature_dir)
+            os.mkdir(label_dir)
+            for _, i in tqdm(enumerate(range(len(source_image_paths))), total=len(source_image_paths), desc="Creating features and labels"):
+                large_source_image = cv.imread(source_image_paths[i])
+                large_target_image = cv.imread(target_image_paths[i]) / 255.0
+
+                source_image_patches, target_image_patches = self._get_image_patches(large_source_image, large_target_image, self.patch_size)
+
+                source_features = fe(images=source_image_patches, return_tensors="pt")["pixel_values"]
+
+                all_features.extend(source_features)
+                all_labels.extend(target_image_patches)
+
+                all_features_images.extend(source_image_patches)
+                all_labels_images.extend(target_image_patches)
+
+            for _, index in tqdm(enumerate(range(len(all_features))), total=len(all_features), desc="Storing features and labels"):
+                np.save(os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), np.asarray(all_features_images[index]) / 255.0)
+                np.save(os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), all_labels_images[index].reshape(self.patch_size[0], self.patch_size[1], 1))
+                torch.save(all_features[index].double(), os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
+                torch.save(torch.from_numpy(all_labels[index]).double(), os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
+            
+            print("Finished creating features and storing labels and features")
+        else:
+            print("Features and labels already created and stored")
+
+        feature_paths = []
+        for path in sorted(os.listdir(feature_dir)):
+            if path.split(".")[-1] == "pt":
+                feature_paths.append(os.path.join(feature_dir, path))
+
+        label_paths = []
+        for path in sorted(os.listdir(label_dir)):
+            if path.split(".")[-1] == "pt":
+                label_paths.append(os.path.join(label_dir, path))
+
+        combined_paths = list(zip(feature_paths, label_paths))
 
         random.shuffle(combined_paths)
 
-        self.source_image_paths, self.target_image_paths = zip(*combined_paths)
+        feature_paths, label_paths = zip(*combined_paths)
 
-        self.source_image_paths = self.source_image_paths[:int(len(self.source_image_paths) * data_percentage)]
-        self.target_image_paths = self.target_image_paths[:int(len(self.target_image_paths) * data_percentage)]
+        feature_paths = feature_paths[:int(len(feature_paths) * data_percentage)]
+        label_paths = label_paths[:int(len(label_paths) * data_percentage)]
 
-        # TODO: Maybe reduce the batch_size, if possible?
+        return feature_paths, label_paths
 
-        self.transform = transform
+
 
     def _get_image_patches(self, source_image, target_image, patch_size):
         """
@@ -79,14 +163,14 @@ class AerialImages(Dataset):
 
         # y, x, patch_size, patch_size, channels ---> [7, 7, 224, 224, 3/1]
         # a = [2, 2, 2]
-        source_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 3), dtype=np.int32)
-        target_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 1), dtype=np.int32)
+        source_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 3), dtype=np.uint8)
+        target_patches = np.zeros((y_patches, x_patches, patch_size[0], patch_size[1], 1), dtype=np.uint8)
 
 
         for y in range(y_patches):
             for x in range(x_patches):
-                source_patch = np.full((patch_size[0], patch_size[1], 3), (255, 102, 255))
-                target_patch = np.zeros((patch_size[0], patch_size[1], 1))
+                source_patch = np.full((patch_size[0], patch_size[1], 3), (255, 102, 255), dtype=np.uint8)
+                target_patch = np.zeros((patch_size[0], patch_size[1], 1), dtype=np.uint8)
                 #                               0 * 224 = 0 : (0 + 1) * 224 = 224
                 temp_source_patch = source_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
                 temp_target_patch = target_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
@@ -104,11 +188,9 @@ class AerialImages(Dataset):
                 target_patches[y, x] = target_patch
 
         source_patches = source_patches.reshape((source_patches.shape[0] * source_patches.shape[1]), source_patches.shape[2], source_patches.shape[3], source_patches.shape[4])
-        target_patches = target_patches.reshape((target_patches.shape[0] * target_patches.shape[1]), target_patches.shape[2], target_patches.shape[3], target_patches.shape[4])
+        target_patches = target_patches.reshape((target_patches.shape[0] * target_patches.shape[1]), target_patches.shape[4], target_patches.shape[2], target_patches.shape[3])
 
         source_patches = [Image.fromarray(np.uint8(arr)) for arr in source_patches]
-
-
 
         return source_patches, target_patches
 
@@ -118,29 +200,52 @@ class AerialImages(Dataset):
 
     def __getitem__(self, idx):
 
-        source_image = cv.imread(self.source_image_paths[idx])
-        target_image = cv.imread(self.target_image_paths[idx])
+        features = torch.empty((len(self.batch_feature_paths[idx]), 3, self.patch_size[0], self.patch_size[1]), dtype=torch.double)
+        labels = torch.empty((len(self.batch_label_paths[idx]), 1, self.patch_size[0], self.patch_size[1]), dtype=torch.double)
 
-        source_patches, target_patches = self._get_image_patches(source_image, target_image, (224, 224))
+        for i, f in enumerate(self.batch_feature_paths[idx]):
+            feature = torch.load(f)
+            features[i] = feature
 
-        return source_patches, target_patches
+        for i, l in enumerate(self.batch_label_paths[idx]):
+            label = torch.load(l)
+            labels[i] = label
+
+        return features, labels
+
+    def get_images(self, idx):
         
+        feature_images = np.zeros((len(self.batch_feature_paths[idx]), self.patch_size[0], self.patch_size[1], 3))
+        label_images = np.zeros((len(self.batch_label_paths[idx]), self.patch_size[0], self.patch_size[1], 1))
+
+        for i, f in enumerate(self.batch_feature_paths[idx]):
+            new_path = ".".join(f.split(".")[:-1]) + ".npy"
+            feature_image = np.load(new_path)
+            feature_images[i] = feature_image
+        
+        for i, f in enumerate(self.batch_label_paths[idx]):
+            new_path = ".".join(f.split(".")[:-1]) + ".npy"
+            label_image = np.load(new_path)
+            label_images[i] = label_image
+        
+        return feature_images, label_images
 
 
 if __name__ == "__main__":
 
+    data = get_dataset("validation")
 
-    print(1500//224)
-    print(1500 % 224)
-    print(15//5)
-
-    data = AerialImages(training_data_dir)
-
-    source_img, target_img = data[0]
+    source_tensor, target_tensor = data[0]
+    source_img, target_img = data.get_images(0)
 
     f, axarr = plt.subplots(1, 2)
     
-    axarr[0].imshow(source_img[-1])
-    axarr[1].imshow(target_img[-1])
+    print(source_img[0])
+    print(target_img[0])
+    print(source_img.shape)
+    print(target_img.shape)
+
+    axarr[0].imshow(source_img[0].reshape(224, 224, 3))
+    axarr[1].imshow(target_img[0].reshape(224, 224, 1))
 
     plt.show()
