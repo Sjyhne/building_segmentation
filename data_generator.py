@@ -44,7 +44,6 @@ def get_dataset(data_type, data_percentage=1.0):
         return AerialImages(validation_data_dir, data_type, data_percentage)
     else:
         raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
-    
 
 
 class AerialImages(Dataset):
@@ -55,6 +54,10 @@ class AerialImages(Dataset):
         self.batch_size = batch_size
 
         self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
+
+        self.channel_means = self.get_channel_means()
+        
+        self.channel_stds = self.get_channel_stds()
 
         self.feature_paths, self.label_paths = self._get_features(self.source_image_paths, self.target_image_paths, data_type, feature_extractor_model, data_percentage)
 
@@ -70,11 +73,39 @@ class AerialImages(Dataset):
             self.batch_feature_paths.append(self.feature_paths[i * self.batch_size:(i + 1) * self.batch_size])
             self.batch_label_paths.append(self.label_paths[i * self.batch_size:(i + 1)*self.batch_size])
         
-        print(self.batch_feature_paths[0])
-        print(self.batch_label_paths[0])
+
+    def get_channel_means(self):
+        
+        r, g, b = 0, 0, 0
+        
+        for image_path in self.source_image_paths:
+            img = cv.imread(image_path)/255
+            r += np.mean(img[:, :, 0])
+            g += np.mean(img[:, :, 1])
+            b += np.mean(img[:, :, 2])
+        
+        r, g, b = r/len(self.source_image_paths), g/len(self.source_image_paths), b/len(self.source_image_paths)
+
+        return [r, g, b]
+
+    def get_channel_stds(self):
+        r_std, g_std, b_std = 0, 0, 0
+
+        for image_path in self.source_image_paths:
+            img = cv.imread(image_path)/255
+            r_std += np.sum([np.square(np.absolute(r - self.channel_means[0])) for r in img[:, :, 0]])/(img.shape[0] * img.shape[1])
+            g_std += np.sum([np.square(np.absolute(g - self.channel_means[1])) for g in img[:, :, 1]])/(img.shape[0] * img.shape[1])
+            b_std += np.sum([np.square(np.absolute(b - self.channel_means[2])) for b in img[:, :, 2]])/(img.shape[0] * img.shape[1])
+
+
+        r_std, g_std, b_std = np.sqrt(r_std/len(self.source_image_paths)), np.sqrt(g_std/len(self.source_image_paths)), np.sqrt(b_std/len(self.source_image_paths))
+
+        return [r_std, g_std, b_std]
+
+        
     
     def _get_features(self, source_image_paths, target_image_paths, data_type, feature_extractor_model, data_percentage):
-        fe = BeitFeatureExtractor.from_pretrained(feature_extractor_model, do_resize=False, do_center_crop=False)
+        fe = BeitFeatureExtractor.from_pretrained(feature_extractor_model, do_resize=False, do_center_crop=False, image_mean=self.channel_means, image_std=self.channel_stds)
 
         all_features = []
         all_labels = []
@@ -234,7 +265,7 @@ class AerialImages(Dataset):
 if __name__ == "__main__":
 
     data = get_dataset("validation")
-
+    """
     source_tensor, target_tensor = data[0]
     source_img, target_img = data.get_images(0)
 
@@ -249,3 +280,4 @@ if __name__ == "__main__":
     axarr[1].imshow(target_img[0].reshape(224, 224, 1))
 
     plt.show()
+    """

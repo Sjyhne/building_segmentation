@@ -18,7 +18,7 @@ def train(model, gpu=False):
 
 
 
-    training_data = get_dataset("validation", data_percentage=1.0)
+    training_data = get_dataset("training", data_percentage=1.0)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
@@ -27,12 +27,17 @@ def train(model, gpu=False):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using:", device)
 
-    n_epochs = 3
+    n_epochs = 10
 
     model = model.to(device)
 
-    running_loss = 0
+    total_loss = []
+    total_iou_5 = []
+    total_iou_7 = []
     for _, epoch in tqdm(enumerate(range(n_epochs)), desc="Training loop", total=n_epochs):
+        epoch_loss = 0
+        epoch_iou_5 = 0
+        epoch_iou_7 = 0
         for i in range(len(training_data)):
             source_images, target_images = training_data[i]
 
@@ -42,25 +47,25 @@ def train(model, gpu=False):
             optimizer.zero_grad()
 
             output_images = model(s_images)
+            
+            output_images = output_images.reshape(output_images.shape[0], output_images.shape[3], output_images.shape[1], output_images.shape[2])
 
             loss = criterion(output_images, t_images)
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
-            
             running_iou_5 = 0
             running_iou_7 = 0
 
             for i in range(len(source_images)):
-                running_iou_5 += IoU(output_images[i].detach().numpy(), t_images[i].detach().numpy(), 0.5)
-                running_iou_7 += IoU(output_images[i].detach().numpy(), t_images[i].detach().numpy(), 0.7)
+                running_iou_5 += IoU(output_images[i].cpu().detach().numpy(), t_images[i].cpu().detach().numpy(), 0.5)
+                running_iou_7 += IoU(output_images[i].cpu().detach().numpy(), t_images[i].cpu().detach().numpy(), 0.7)
 
-            iou_5 = running_iou_5 / len(output_images)
-            iou_7 = running_iou_7 / len(output_images)
+            epoch_iou_5 += running_iou_5 / len(output_images)
+            epoch_iou_7 += running_iou_7 / len(output_images)
+            epoch_loss += loss.item()
 
-            print('[%d, %5d] loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f' % (epoch + 1, i + 1, running_loss, iou_5, iou_7))
-            running_loss = 0
+        print('[%d] loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f' % (epoch + 1, epoch_loss/len(training_data), epoch_iou_5/len(training_data), epoch_iou_7/len(training_data)))
 
     print("Finished training")
 
@@ -83,9 +88,9 @@ if __name__ == "__main__":
     f, axarr = plt.subplots(1, 3)
 
     
-    axarr[0].imshow(output_images[0].detach().numpy())
+    axarr[0].imshow(output_images[0].cpu().detach().numpy())
     axarr[1].imshow(source_images[0])
-    axarr[2].imshow(target_images[0])
+    axarr[2].imshow(target_images[0].cpu().detach().numpy())
     
     plt.show()
 

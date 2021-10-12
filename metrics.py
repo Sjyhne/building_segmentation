@@ -11,9 +11,6 @@ def IoU(output_image, target_image, threshold):
         * 
     """
 
-    # Make target image color values normalized
-    target_image = target_image/255
-
     if threshold == 0.5:
         output_image = np.round(output_image)
     else:
