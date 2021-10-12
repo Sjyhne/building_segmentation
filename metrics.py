@@ -2,14 +2,23 @@ import matplotlib.pyplot as plt
 from data_generator import get_dataset
 
 import numpy as np
+import torch
 
-def IoU(output_image, target_image, threshold):
+from utils import UnNormalize
+
+def IoU(output_image, target_image, threshold, mean, std):
     """
         Function for calculating the Intersection of Union for the predicted images.
         * output_image (Predicted image)
         * target_image (Labeled image)
         * 
     """
+
+    unnormalize = UnNormalize(mean=mean, std=std)
+
+    output_image = unnormalize(output_image)
+
+    print("min, max:", torch.min(output_image), torch.max(output_image))
 
     if threshold == 0.5:
         output_image = np.round(output_image)
