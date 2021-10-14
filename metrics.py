@@ -4,8 +4,6 @@ from data_generator import get_dataset
 import numpy as np
 import torch
 
-from utils import UnNormalize
-
 def IoU(output_image, target_image, threshold):
     """
         Function for calculating the Intersection of Union for the predicted images.
