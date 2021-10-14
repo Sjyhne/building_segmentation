@@ -11,6 +11,8 @@ from tqdm import tqdm
 import os
 import random
 import shutil
+from sys import platform
+from pathlib import Path, PureWindowsPath
 
 main_dir = "./data/tiff"
 
@@ -52,13 +54,6 @@ class AerialImages(Dataset):
         self.batch_size = batch_size
 
         self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
-
-        if len(os.listdir("features/microsoft/beit-base-patch16-224-pt22k-ft22k/training/features")) == 0:
-            self.channel_means = self.get_channel_means()
-            self.channel_stds = self.get_channel_stds()
-        else:
-            self.channel_means = []
-            self.channel_stds = []
 
         self.feature_paths, self.label_paths = self._get_features(self.source_image_paths,
                                                                   self.target_image_paths,
@@ -115,13 +110,6 @@ class AerialImages(Dataset):
                       feature_extractor_model,
                       data_percentage
                       ):
-        fe = BeitFeatureExtractor.from_pretrained(
-            feature_extractor_model,
-            do_resize=False,
-            do_center_crop=False,
-            image_mean=self.channel_means,
-            image_std=self.channel_stds
-        )
 
         all_features = []
         all_labels = []
@@ -129,12 +117,14 @@ class AerialImages(Dataset):
         all_features_images = []
         all_labels_images = []
 
-        target_dir = os.path.join("./features", feature_extractor_model, data_type)
-        feature_dir = os.path.join(target_dir, "features")
-        label_dir = os.path.join(target_dir, "labels")
+        target_dir = Path(os.path.join("features", feature_extractor_model, data_type))
+        feature_dir = Path(os.path.join(target_dir, "features"))
+        label_dir = Path(os.path.join(target_dir, "labels"))
 
-        if os.path.exists(target_dir) and len(os.listdir(feature_dir)) == 0:
-            shutil.rmtree(target_dir)
+        if platform == "win32":
+            target_dir = PureWindowsPath(target_dir)
+            feature_dir = PureWindowsPath(feature_dir)
+            label_dir = PureWindowsPath(label_dir)
         
         # if not "./features/model.../train"
         if not os.path.exists(os.path.join(target_dir)):
@@ -142,6 +132,18 @@ class AerialImages(Dataset):
             os.mkdir(target_dir)
             os.mkdir(feature_dir)
             os.mkdir(label_dir)
+
+            self.channel_means = self.get_channel_means()
+            self.channel_stds = self.get_channel_stds()
+
+            fe = BeitFeatureExtractor.from_pretrained(
+                feature_extractor_model,
+                do_resize=False,
+                do_center_crop=False,
+                image_mean=self.channel_means,
+                image_std=self.channel_stds
+            )
+
             for _, i in tqdm(enumerate(range(len(source_image_paths))),
                              total=len(source_image_paths),
                              desc="Creating features and labels"
@@ -253,7 +255,7 @@ class AerialImages(Dataset):
 
 
     def __len__(self):
-        return len(self.source_image_paths)
+        return len(self.batch_feature_paths)
 
     def __getitem__(self, idx):
 
