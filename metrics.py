@@ -14,11 +14,9 @@ def IoU(output_image, target_image, threshold, mean, std):
         * 
     """
 
-    unnormalize = UnNormalize(mean=mean, std=std)
-
-    output_image = unnormalize(output_image)
-
     print("min, max:", torch.min(output_image), torch.max(output_image))
+
+    output_image = output_image.cpu().detach().numpy()
 
     if threshold == 0.5:
         output_image = np.round(output_image)

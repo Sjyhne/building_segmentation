@@ -1,19 +1,15 @@
-from re import S
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
 import torch
 
-from numpy.lib.utils import source
 from torch.utils.data import Dataset
-from matplotlib import cm
 from PIL import Image
 from transformers import BeitFeatureExtractor
 from tqdm import tqdm
 
 import os
 import random
-import time
 import shutil
 
 main_dir = "./data/tiff"
@@ -21,6 +17,7 @@ main_dir = "./data/tiff"
 training_data_dir = [main_dir + "/train", main_dir + "/train_labels"]
 test_data_dir = [main_dir + "/test", main_dir + "/test_labels"]
 validation_data_dir = [main_dir + "/val", main_dir + "/val_labels"]
+
 
 def get_image_paths(data_dir):
     source_image_dir, target_image_dir = data_dir
@@ -34,6 +31,7 @@ def get_image_paths(data_dir):
         target_image_paths.append(os.path.join(target_image_dir, file))
     
     return source_image_paths, target_image_paths
+
 
 def get_dataset(data_type, data_percentage=1.0):
     if data_type == "training":
@@ -55,11 +53,18 @@ class AerialImages(Dataset):
 
         self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
 
-        self.channel_means = self.get_channel_means()
-        
-        self.channel_stds = self.get_channel_stds()
+        if len(os.listdir("features/microsoft/beit-base-patch16-224-pt22k-ft22k/training/features")) == 0:
+            self.channel_means = self.get_channel_means()
+            self.channel_stds = self.get_channel_stds()
+        else:
+            self.channel_means = []
+            self.channel_stds = []
 
-        self.feature_paths, self.label_paths = self._get_features(self.source_image_paths, self.target_image_paths, data_type, feature_extractor_model, data_percentage)
+        self.feature_paths, self.label_paths = self._get_features(self.source_image_paths,
+                                                                  self.target_image_paths,
+                                                                  data_type,
+                                                                  feature_extractor_model,
+                                                                  data_percentage)
 
         # Todo: Create bacthes
         self.batch_feature_paths = []
@@ -72,10 +77,10 @@ class AerialImages(Dataset):
         for i in range(div):
             self.batch_feature_paths.append(self.feature_paths[i * self.batch_size:(i + 1) * self.batch_size])
             self.batch_label_paths.append(self.label_paths[i * self.batch_size:(i + 1)*self.batch_size])
-        
 
     def get_channel_means(self):
-        
+        print("Getting channel means...")
+
         r, g, b = 0, 0, 0
         
         for image_path in self.source_image_paths:
@@ -85,10 +90,12 @@ class AerialImages(Dataset):
             b += np.mean(img[:, :, 2])
         
         r, g, b = r/len(self.source_image_paths), g/len(self.source_image_paths), b/len(self.source_image_paths)
-
+        print("Done getting channel means...\n")
         return [r, g, b]
 
     def get_channel_stds(self):
+        print("Getting channel stds...")
+
         r_std, g_std, b_std = 0, 0, 0
 
         for image_path in self.source_image_paths:
@@ -97,15 +104,24 @@ class AerialImages(Dataset):
             g_std += np.sum([np.square(np.absolute(g - self.channel_means[1])) for g in img[:, :, 1]])/(img.shape[0] * img.shape[1])
             b_std += np.sum([np.square(np.absolute(b - self.channel_means[2])) for b in img[:, :, 2]])/(img.shape[0] * img.shape[1])
 
-
         r_std, g_std, b_std = np.sqrt(r_std/len(self.source_image_paths)), np.sqrt(g_std/len(self.source_image_paths)), np.sqrt(b_std/len(self.source_image_paths))
-
+        print("Done getting channel stds...\n")
         return [r_std, g_std, b_std]
 
-        
-    
-    def _get_features(self, source_image_paths, target_image_paths, data_type, feature_extractor_model, data_percentage):
-        fe = BeitFeatureExtractor.from_pretrained(feature_extractor_model, do_resize=False, do_center_crop=False, image_mean=self.channel_means, image_std=self.channel_stds)
+    def _get_features(self,
+                      source_image_paths,
+                      target_image_paths,
+                      data_type,
+                      feature_extractor_model,
+                      data_percentage
+                      ):
+        fe = BeitFeatureExtractor.from_pretrained(
+            feature_extractor_model,
+            do_resize=False,
+            do_center_crop=False,
+            image_mean=self.channel_means,
+            image_std=self.channel_stds
+        )
 
         all_features = []
         all_labels = []
@@ -117,18 +133,25 @@ class AerialImages(Dataset):
         feature_dir = os.path.join(target_dir, "features")
         label_dir = os.path.join(target_dir, "labels")
 
-        #shutil.rmtree(target_dir)
+        if os.path.exists(target_dir) and len(os.listdir(feature_dir)) == 0:
+            shutil.rmtree(target_dir)
         
         # if not "./features/model.../train"
         if not os.path.exists(os.path.join(target_dir)):
+            print("Did not find:", target_dir, "... Creating necessary dirs")
             os.mkdir(target_dir)
             os.mkdir(feature_dir)
             os.mkdir(label_dir)
-            for _, i in tqdm(enumerate(range(len(source_image_paths))), total=len(source_image_paths), desc="Creating features and labels"):
+            for _, i in tqdm(enumerate(range(len(source_image_paths))),
+                             total=len(source_image_paths),
+                             desc="Creating features and labels"
+                             ):
                 large_source_image = cv.imread(source_image_paths[i])
                 large_target_image = cv.imread(target_image_paths[i]) / 255.0
 
-                source_image_patches, target_image_patches = self._get_image_patches(large_source_image, large_target_image, self.patch_size)
+                source_image_patches, target_image_patches = self._get_image_patches(large_source_image,
+                                                                                     large_target_image,
+                                                                                     self.patch_size)
 
                 source_features = fe(images=source_image_patches, return_tensors="pt")["pixel_values"]
 
@@ -137,6 +160,9 @@ class AerialImages(Dataset):
 
                 all_features_images.extend(source_image_patches)
                 all_labels_images.extend(target_image_patches)
+            
+            # Releasing memory used by fe
+            del fe
 
             for _, index in tqdm(enumerate(range(len(all_features))), total=len(all_features), desc="Storing features and labels"):
                 np.save(os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), np.asarray(all_features_images[index]) / 255.0)

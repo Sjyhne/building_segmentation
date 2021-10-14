@@ -63,7 +63,9 @@ class BeitSegmentationModel(nn.Module):
         patch_dim=16,
         num_channels=3,
         num_classes=1,
-        pretrained_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
+        batch_size=16,
+        pretrained_model="microsoft/beit-base-patch16-224-pt22k-ft22k"
+    ):
 
         super(BeitSegmentationModel, self).__init__()
 
@@ -73,13 +75,13 @@ class BeitSegmentationModel(nn.Module):
         self.patch_dim = patch_dim
         self.num_channels = num_channels
         self.num_classes = num_classes
+        self.batch_size = batch_size
 
         # BEiT encoder without segmentation head, can use BeitConfig to
         # alter some of the default values used
         self.beit_base = BeitModel.from_pretrained(pretrained_model)
 
-        # TODO: Do this before the training loop is done, will save time, and memory?
-        self.beit_feature_extractor = BeitFeatureExtractor.from_pretrained(pretrained_model)
+        self.last_layer_activation = nn.Softmax(dim=2)
 
         self.decoder = Decoder2D(self.num_channels, self.num_classes)
 
@@ -95,7 +97,12 @@ class BeitSegmentationModel(nn.Module):
 
         encoder_output = self.beit_base(pixel_values=x)        
         
-        pooler_output = encoder_output.pooler_output.reshape(self.batch_size, self.num_channels, self.patch_dim, self.patch_dim)
+        pooler_output = encoder_output.pooler_output.reshape(
+            self.batch_size,
+            self.num_channels,
+            self.patch_dim,
+            self.patch_dim
+        )
 
         return pooler_output
 
@@ -109,6 +116,8 @@ class BeitSegmentationModel(nn.Module):
 
         decoder_output = decoder_output.reshape(self.batch_size, self.img_size, self.img_size, self.num_classes)
 
+        decoder_output = self.last_layer_activation(decoder_output)
+
         return decoder_output
 
 
@@ -117,16 +126,18 @@ if __name__ == "__main__":
         "img_size": 224,
         "patch_dim": 16,
         "num_channels": 3,
-        "num_classes": 1,
+        "num_classes": 2,
+        "batch_size": 16,
         "pretrained_model": "microsoft/beit-base-patch16-224-pt22k-ft22k",
     }
 
     b = BeitSegmentationModel(
-            p["img_size"],
-            p["patch_dim"],
-            p["num_channels"], 
-            p["num_classes"],
-            p["pretrained_model"]
+            img_size=p["img_size"],
+            patch_dim=p["patch_dim"],
+            num_channels=p["num_channels"],
+            num_classes=p["num_classes"],
+            batch_size=p["batch_size"],
+            pretrained_model=p["pretrained_model"]
         )
 
     url = 'http://images.cocodataset.org/val2017/000000039769.jpg'

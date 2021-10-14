@@ -1,6 +1,6 @@
 import sys
 import os.path
-from numpy.lib.utils import source
+
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 
@@ -22,7 +22,7 @@ def train(model, gpu=False):
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
-    # Training loop
+    # Training loop 
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using:", device)
@@ -39,33 +39,57 @@ def train(model, gpu=False):
         epoch_iou_5 = 0
         epoch_iou_7 = 0
         for i in range(len(training_data)):
-            source_images, target_images = training_data[i]
+            source, target = training_data[i]
 
-            s_images = source_images.double().to(device)
-            t_images = target_images.double().to(device)
+            source = source.to(device)
+            target = target.to(device)
 
             optimizer.zero_grad()
 
-            output_images = model(s_images)
-            
-            output_images = output_images.reshape(output_images.shape[0], output_images.shape[3], output_images.shape[1], output_images.shape[2])
+            output = model(source)
 
-            loss = criterion(output_images, t_images)
+            oshape = output.shape
+
+            print("oshape:", oshape)
+            
+            argmax = torch.argmax(output, dim=3)
+
+            print("argmax:", argmax)
+            # TODO: Sjekk ut hvorfor det er trøbbel her'a
+            output = output[:, :, :, argmax]
+
+            print("oshape:", output.shape)
+
+            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2])
+
+            loss = criterion(output, target)
             loss.backward()
             optimizer.step()
 
             running_iou_5 = 0
             running_iou_7 = 0
 
-            for i in range(len(source_images)):
-                running_iou_5 += IoU(output_images[i].cpu().detach().numpy(), t_images[i].cpu().detach().numpy(), 0.5)
-                running_iou_7 += IoU(output_images[i].cpu().detach().numpy(), t_images[i].cpu().detach().numpy(), 0.7)
+            for idx in range(len(source_images)):
+                running_iou_5 += IoU(output_images[idx].cpu().detach().numpy(), target[idx].cpu().detach().numpy(), 0.5)
+                running_iou_7 += IoU(output_images[idx].cpu().detach().numpy(), target[idx].cpu().detach().numpy(), 0.7)
 
             epoch_iou_5 += running_iou_5 / len(output_images)
             epoch_iou_7 += running_iou_7 / len(output_images)
             epoch_loss += loss.item()
 
         print('[%d] loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f' % (epoch + 1, epoch_loss/len(training_data), epoch_iou_5/len(training_data), epoch_iou_7/len(training_data)))
+
+        total_iou_5.append(epoch_iou_5)
+        total_iou_7.append(epoch_iou_7)
+        total_loss.append(epoch_loss)
+
+    with open("metrics.txt", "a+") as file:
+        for i in range(len(total_loss)):
+            file.write(f"[{i + 1}]\n")
+            file.write(f"IoU 5: {total_iou_5[i]}\n")
+            file.write(f"IoU 7: {total_iou_7[i]}\n")
+            file.write(f"Loss:{total_loss[i]}")
+
 
     print("Finished training")
 
@@ -74,7 +98,7 @@ def train(model, gpu=False):
 
 if __name__ == "__main__":
 
-    model = BeitSegmentationModel(lr=0.00001)
+    model = BeitSegmentationModel(lr=0.00001, num_classes=2)
 
     model = model.double()
     model = train(model)
