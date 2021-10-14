@@ -290,6 +290,7 @@ class AerialImages(Dataset):
         return feature_images, label_images
 
 
+
 if __name__ == "__main__":
 
     data = get_dataset("validation")
