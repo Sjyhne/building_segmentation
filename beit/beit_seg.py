@@ -82,7 +82,7 @@ class BeitSegmentationModel(nn.Module):
         # alter some of the default values used
         self.beit_base = BeitModel.from_pretrained(pretrained_model)
 
-        self.last_layer_activation = nn.LogSoftmax(dim=3)
+        self.last_layer_activation = nn.Softmax(dim=3)
 
         self.decoder = Decoder2D(self.num_channels, self.num_classes)
 
@@ -117,7 +117,7 @@ class BeitSegmentationModel(nn.Module):
 
         decoder_output = decoder_output.reshape(self.batch_size, self.img_size, self.img_size, self.num_classes)
 
-        #decoder_output = torch.max(self.last_layer_activation(decoder_output), dim=3)[0].unsqueeze(3)
+        decoder_output = self.last_layer_activation(decoder_output)
 
         return decoder_output
 

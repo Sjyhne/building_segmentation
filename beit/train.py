@@ -17,12 +17,12 @@ from metrics import IoU, soft_dice_loss
 
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=0.005)
+    training_data = get_dataset("training", data_percentage=1.0, batch_size=32)
     print("Len training_data:", len(training_data))
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.NLLLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
-    # Training loop 
+    # Training loop
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using:", device)
@@ -46,17 +46,20 @@ def train(model, gpu=False):
 
             optimizer.zero_grad()
 
-            #output = torch.argmax(model(source), dim=3).unsqueeze(3)
             output = model(source)
 
             oshape = output.shape
 
-            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
+            output = output.reshape(oshape[0] * oshape[1] * oshape[2], oshape[3]).double()
+            target = target.flatten().long()
 
-            loss = criterion(output, target)
-            # Why?
+            loss = criterion(torch.log(output), target)
+
             loss.backward()
             optimizer.step()
+
+            target = target.unsqueeze(-1)
+            output = output.max(dim=1)[0].unsqueeze(-1)
 
             epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data))
             epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data))

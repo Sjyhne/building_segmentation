@@ -9,7 +9,7 @@ def IoU(output_image, target_image, threshold):
         Function for calculating the Intersection of Union for the predicted images.
         * output_image (Predicted image)
         * target_image (Labeled image)
-        * 
+        *
     """
 
     output_image = output_image.cpu().detach().numpy()
@@ -24,7 +24,11 @@ def IoU(output_image, target_image, threshold):
 
     union = np.logical_or(output_image, target_image)
 
-    return np.sum(intersection) / np.sum(union)
+    iou = np.sum(intersection) / np.sum(union)
+
+    print("iou:", iou)
+
+    return iou if iou != np.nan else 0.0
 
 
 def soft_dice_loss(output_image, target_image, epsilon=1e-6):
@@ -39,7 +43,7 @@ def soft_dice_loss(output_image, target_image, epsilon=1e-6):
 
 
 if __name__ == "__main__":
-    
+
     train_data = get_dataset("training")
 
     test = np.random.standard_normal((224, 224, 1))
@@ -60,4 +64,4 @@ if __name__ == "__main__":
     axarr[1].imshow(test)
 
     plt.show()
-    
+
