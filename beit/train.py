@@ -17,9 +17,9 @@ from metrics import IoU, soft_dice_loss
 
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=1.0, batch_size=16)
+    training_data = get_dataset("training", data_percentage=1.0, batch_size=32)
     print("Len training_data:", len(training_data))
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
     # Training loop
@@ -41,6 +41,8 @@ def train(model, gpu=False):
         for i in range(len(training_data)):
             source, target = training_data[i]
 
+            print(source.shape)
+            
             source = source.to(device)
             target = target.to(device)
 
@@ -50,8 +52,7 @@ def train(model, gpu=False):
 
             oshape = output.shape
 
-            output = output.reshape(oshape[0] * oshape[1] * oshape[2], oshape[3]).double()
-            target = target.flatten().long()
+            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
             
             loss = criterion(output, target)
 
@@ -59,7 +60,6 @@ def train(model, gpu=False):
             optimizer.step()
 
             target = target.unsqueeze(-1)
-            output = torch.nn.functional.softmax(output, dim=1).max(dim=1)[0].unsqueeze(-1)
             
             epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data), 4)
             epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data), 4)
@@ -109,8 +109,7 @@ def evaluate(model, criterion, device):
 
             oshape = output.shape
 
-            output = output.reshape(oshape[0] * oshape[1] * oshape[2], oshape[3]).double()
-            target = target.flatten().long()
+            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
 
             loss = criterion(output, target)
             
@@ -127,7 +126,7 @@ def evaluate(model, criterion, device):
 
 if __name__ == "__main__":
 
-    model = BeitSegmentationModel(lr=0.0001, num_classes=2)
+    model = BeitSegmentationModel(lr=0.0001, num_classes=1)
 
     model = model.double()
     model = train(model)

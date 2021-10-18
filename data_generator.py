@@ -138,8 +138,6 @@ class AerialImages(Dataset):
 
             fe = BeitFeatureExtractor.from_pretrained(
                 feature_extractor_model,
-                do_resize=False,
-                do_center_crop=False,
                 image_mean=self.channel_means,
                 image_std=self.channel_stds
             )
