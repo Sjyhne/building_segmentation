@@ -15,7 +15,7 @@ class Decoder2D(nn.Module):
 
     # TODO: Maybe add dropout? Not sure if it is needed.
 
-    def __init__(self, in_channels, out_channels, features=[256, 128, 64, 32]):
+    def __init__(self, in_channels, out_channels, features=[512, 256, 128, 64]):
         super().__init__()
         self.decoder_1 = nn.Sequential(
             nn.Conv2d(in_channels, features[0], 2, padding=0),
@@ -43,7 +43,7 @@ class Decoder2D(nn.Module):
             nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         )
 
-        self.final_out = nn.Conv2d(features[-1], out_channels, 3, padding=0)
+        self.final_out = (nn.Conv2d(features[-1], out_channels, 3, padding=0))
 
     def forward(self, x):
         x = self.decoder_1(x)
@@ -51,6 +51,8 @@ class Decoder2D(nn.Module):
         x = self.decoder_3(x)
         x = self.decoder_4(x)
         x = self.final_out(x)
+
+        x = torch.nn.functional.sigmoid(x)
 
         return x
 

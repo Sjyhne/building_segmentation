@@ -17,9 +17,9 @@ from metrics import IoU, soft_dice_loss
 
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=1.0, batch_size=32)
+    training_data = get_dataset("training", data_percentage=0.01, batch_size=16)
     print("Len training_data:", len(training_data))
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
     # Training loop
@@ -41,8 +41,6 @@ def train(model, gpu=False):
         for i in range(len(training_data)):
             source, target = training_data[i]
 
-            print(source.shape)
-            
             source = source.to(device)
             target = target.to(device)
 
