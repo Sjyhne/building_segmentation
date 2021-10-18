@@ -26,7 +26,6 @@ def IoU(output_image, target_image, threshold):
 
     iou = np.sum(intersection) / np.sum(union)
 
-    print("iou:", iou)
 
     return iou if iou != np.nan else 0.0
 

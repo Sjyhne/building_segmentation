@@ -17,9 +17,9 @@ from metrics import IoU, soft_dice_loss
 
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=1.0, batch_size=32)
+    training_data = get_dataset("training", data_percentage=1.0, batch_size=16)
     print("Len training_data:", len(training_data))
-    criterion = nn.NLLLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
 
     # Training loop
@@ -27,7 +27,7 @@ def train(model, gpu=False):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using:", device)
 
-    n_epochs = 1
+    n_epochs = 20
 
     model = model.to(device)
 
@@ -52,19 +52,19 @@ def train(model, gpu=False):
 
             output = output.reshape(oshape[0] * oshape[1] * oshape[2], oshape[3]).double()
             target = target.flatten().long()
-
-            loss = criterion(torch.log(output), target)
+            
+            loss = criterion(output, target)
 
             loss.backward()
             optimizer.step()
 
             target = target.unsqueeze(-1)
-            output = output.max(dim=1)[0].unsqueeze(-1)
-
-            epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data))
-            epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data))
-            epoch_loss += round(loss.item()/len(training_data))
-            epoch_dice += round(soft_dice_loss(output, target)/len(training_data))
+            output = torch.nn.functional.softmax(output, dim=1).max(dim=1)[0].unsqueeze(-1)
+            
+            epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data), 4)
+            epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data), 4)
+            epoch_loss += round(loss.item()/len(training_data), 4)
+            epoch_dice += round(soft_dice_loss(output, target)/len(training_data), 4)
 
         print('[%d]\n Training -> loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f, dice: %.3f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_iou_7, epoch_dice))
 
@@ -109,10 +109,14 @@ def evaluate(model, criterion, device):
 
             oshape = output.shape
 
-            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
+            output = output.reshape(oshape[0] * oshape[1] * oshape[2], oshape[3]).double()
+            target = target.flatten().long()
 
             loss = criterion(output, target)
-
+            
+            target = target.unsqueeze(-1)
+            output = output.max(dim=1)[0].unsqueeze(-1)
+            
             test_epoch_iou_5 += IoU(output, target, 0.5)/len(test_data)
             test_epoch_iou_7 += IoU(output, target, 0.7)/len(test_data)
             test_epoch_loss += loss.item()/len(test_data)
@@ -123,7 +127,7 @@ def evaluate(model, criterion, device):
 
 if __name__ == "__main__":
 
-    model = BeitSegmentationModel(lr=0.00001, num_classes=2)
+    model = BeitSegmentationModel(lr=0.0001, num_classes=2)
 
     model = model.double()
     model = train(model)
@@ -131,17 +135,18 @@ if __name__ == "__main__":
     test_data = get_dataset("test")
 
     source_images, target_images = test_data[0]
+    source_images, target_images = source_images.to("cuda:0"), target_images.to("cuda:0")
+    
     real_images, real_target_images = test_data.get_images(0)
 
-    output_images = torch.max(model(source_images), dim=3)[0].unsqueeze(3)
-
-    print("output_images.shape", output_images.shape)
+    output_images = torch.nn.functional.softmax(model(source_images), dim=3).max(dim=3)[0].unsqueeze(3)
 
     f, axarr = plt.subplots(1, 4)
+    
+    for i in range(len(output_images)):
+        
+        axarr[0].imshow(output_images[i].cpu().detach().numpy())
+        axarr[1].imshow(real_images[i])
+        axarr[2].imshow(real_target_images[i])
 
-    axarr[0].imshow(output_images[0].cpu().detach().numpy())
-    axarr[1].imshow(real_images[0])
-    axarr[2].imshow(real_target_images[0])
-    axarr[3].imshow(target_images[0].cpu().detach().numpy().reshape(224, 224, 1))
-
-    plt.savefig("comparison_test.png")
+        plt.savefig(f"comparisons/comparison_test_{i}.png")
