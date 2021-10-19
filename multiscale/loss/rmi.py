@@ -14,9 +14,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import rmi_utils
-from ..config import cfg
-
+from loss import rmi_utils
+from config import cfg
 _euler_num = 2.718281828        # euler number
 _pi = 3.14159265		# pi
 _ln_2_pi = 1.837877		# ln(2 * pi)

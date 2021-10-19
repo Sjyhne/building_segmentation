@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from ..config import cfg
+from config import cfg
 
 
 align_corners = cfg.MODEL.ALIGN_CORNERS

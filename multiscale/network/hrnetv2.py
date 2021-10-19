@@ -18,8 +18,8 @@ import torch.nn as nn
 import torch._utils
 import torch.nn.functional as F
 
-from mynn import Norm2d
-from ..config import cfg
+from network.mynn import Norm2d
+from config import cfg
 
 
 BN_MOMENTUM = 0.1
