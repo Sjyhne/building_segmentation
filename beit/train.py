@@ -17,10 +17,13 @@ from metrics import IoU, soft_dice_loss
 
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=0.01, batch_size=16)
+    training_data = get_dataset("training", data_percentage=0.4, batch_size=32)
     print("Len training_data:", len(training_data))
+
+
+
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(params=model.parameters(), lr=model.lr)
+    optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
 
     # Training loop
 
@@ -51,14 +54,12 @@ def train(model, gpu=False):
             oshape = output.shape
 
             output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
-            
+
             loss = criterion(output, target)
 
             loss.backward()
             optimizer.step()
 
-            target = target.unsqueeze(-1)
-            
             epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data), 4)
             epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data), 4)
             epoch_loss += round(loss.item()/len(training_data), 4)
@@ -71,14 +72,14 @@ def train(model, gpu=False):
         log["total_loss"].append(epoch_loss)
         log["total_dice"].append(epoch_dice)
 
-        test_loss, test_iou_5, test_iou_7, test_dice = evaluate(model, criterion, device)
+        #test_loss, test_iou_5, test_iou_7, test_dice = evaluate(model, criterion, device)
 
-        log["test_total_iou_5"].append(test_iou_5)
-        log["test_total_iou_7"].append(test_iou_7)
-        log["test_total_loss"].append(test_loss)
-        log["test_total_dice"].append(test_dice)
+        #log["test_total_iou_5"].append(test_iou_5)
+        #log["test_total_iou_7"].append(test_iou_7)
+        #log["test_total_loss"].append(test_loss)
+        #log["test_total_dice"].append(test_dice)
 
-        print('Test -> loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f, dice: %.3f' % (test_loss, test_iou_5, test_iou_7, test_dice))
+        #print('Test -> loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f, dice: %.3f' % (test_loss, test_iou_5, test_iou_7, test_dice))
 
 
     with open("metrics.json", "w") as file:
@@ -138,7 +139,7 @@ if __name__ == "__main__":
 
     output_images = torch.nn.functional.softmax(model(source_images), dim=3).max(dim=3)[0].unsqueeze(3)
 
-    f, axarr = plt.subplots(1, 4)
+    f, axarr = plt.subplots(1, 3)
     
     for i in range(len(output_images)):
         

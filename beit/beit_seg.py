@@ -52,7 +52,7 @@ class Decoder2D(nn.Module):
         x = self.decoder_4(x)
         x = self.final_out(x)
 
-        x = torch.nn.functional.sigmoid(x)
+        x = torch.sigmoid(x)
 
         return x
 
@@ -83,6 +83,9 @@ class BeitSegmentationModel(nn.Module):
         # BEiT encoder without segmentation head, can use BeitConfig to
         # alter some of the default values used
         self.beit_base = BeitModel.from_pretrained(pretrained_model)
+        
+        for param in self.beit_base.parameters():
+            param.requires_grad = False
 
         self.decoder = Decoder2D(self.num_channels, self.num_classes)
 
