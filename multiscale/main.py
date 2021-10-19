@@ -1,5 +1,5 @@
-from ocrnet import HRNet
-from rmi import RMILoss
+from network.ocrnet import HRNet
+from loss.rmi import RMILoss
 
 hrnet = HRNet(2, RMILoss(
             num_classes=2,

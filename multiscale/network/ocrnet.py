@@ -3,7 +3,7 @@ from torch import nn
 from network.mynn import initialize_weights, Upsample, scale_as
 from network.mynn import ResizeX
 from network.utils import get_trunk
-from network.utils import BNReLU, get_aspp
+from network.utils import BNReLU
 from network.utils import make_attn_head
 from network.ocr_utils import SpatialGather_Module, SpatialOCR_Module
 from config import cfg
