@@ -12,13 +12,17 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
+from torch.optim import RMSprop
+
+
 from data_generator import get_dataset
 from beit_seg import BeitSegmentationModel
 from metrics import IoU, soft_dice_loss
 
+
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=0.1, batch_size=32)
+    training_data = get_dataset("training", data_percentage=1.0, batch_size=16)
     print("Len training_data:", len(training_data))
     
     target_size, target_sum = 0, 0
@@ -29,16 +33,16 @@ def train(model, gpu=False):
     
     positive_pixel_weight = target_size / target_sum
 
-    criterion = nn.BCEWithLogitsLoss(pos_weight=positive_pixel_weight)
+    criterion = RMSprop()
 
-    optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
+    optimizer = optim.AdamW(params=model.decoder.parameters(), lr=model.lr)
 
     # Training loop
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using:", device)
 
-    n_epochs = 20
+    n_epochs = 100
 
     model = model.to(device)
 
