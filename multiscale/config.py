@@ -94,7 +94,7 @@ __C.DATASET.CITYSCAPES_SPLITS = 3
 __C.DATASET.MEAN = [0.485, 0.456, 0.406]
 __C.DATASET.STD = [0.229, 0.224, 0.225]
 __C.DATASET.NAME = ''
-__C.DATASET.NUM_CLASSES = 0
+__C.DATASET.NUM_CLASSES = 1
 __C.DATASET.IGNORE_LABEL = 255
 __C.DATASET.DUMP_IMAGES = False
 __C.DATASET.CLASS_UNIFORM_PCT = 0.5
@@ -337,7 +337,6 @@ def update_dataset_cfg(num_classes, ignore_label):
     cfg.immutable(False)
     cfg.DATASET.NUM_CLASSES = num_classes
     cfg.DATASET.IGNORE_LABEL = ignore_label
-    logx.msg('num_classes = {}'.format(num_classes))
     cfg.immutable(True)
 
 

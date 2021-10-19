@@ -1,6 +1,6 @@
 from torch import nn
 
-from network.mynn import initialize_weights, Upsample, scale_as
+from network.mynn import Upsample, scale_as, initialize_weights
 from network.mynn import ResizeX
 from network.utils import get_trunk
 from network.utils import BNReLU

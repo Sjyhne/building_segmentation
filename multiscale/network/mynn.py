@@ -6,14 +6,14 @@ from config import cfg
 align_corners = cfg.MODEL.ALIGN_CORNERS
 
 
-def Norm2d(in_channels, **kwargs):
-    """
-    Custom Norm Function to allow flexible switching
-    """
-    layer = getattr(cfg.MODEL, 'BNFUNC')
-    print(layer)
-    normalization_layer = layer(in_channels, **kwargs)
-    return normalization_layer
+# def Norm2d(in_channels, **kwargs):
+#     """
+#     Custom Norm Function to allow flexible switching
+#     """
+#     layer = getattr(cfg.MODEL, 'BNFUNC')
+#     print(layer)
+#     normalization_layer = layer(in_channels, **kwargs)
+#     return normalization_layer
 
 
 def initialize_weights(*models):

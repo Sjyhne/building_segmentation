@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from torch import nn
 
-from network.mynn import Norm2d, Upsample
+#from network.mynn import Norm2d, Upsample
 import network.hrnetv2 as hrnetv2
 
 from config import cfg
@@ -30,7 +30,7 @@ def get_trunk(trunk_name, output_stride=8):
 
 def BNReLU(ch):
     return nn.Sequential(
-        Norm2d(ch),
+        nn.BatchNorm2d(ch),
         nn.ReLU())
 
 
@@ -52,13 +52,13 @@ def make_attn_head(in_ch, out_ch):
 
     od = OrderedDict([('conv0', nn.Conv2d(in_ch, bot_ch, kernel_size=3,
                                           padding=1, bias=False)),
-                      ('bn0', Norm2d(bot_ch)),
+                      ('bn0', nn.BatchNorm2d(bot_ch)),
                       ('re0', nn.ReLU(inplace=True))])
 
     if cfg.MODEL.MSCALE_INNER_3x3:
         od['conv1'] = nn.Conv2d(bot_ch, bot_ch, kernel_size=3, padding=1,
                                 bias=False)
-        od['bn1'] = Norm2d(bot_ch)
+        od['bn1'] = nn.BatchNorm2d(bot_ch)
         od['re1'] = nn.ReLU(inplace=True)
 
     if cfg.MODEL.MSCALE_DROPOUT:
@@ -75,10 +75,10 @@ def make_attn_head(in_ch, out_ch):
 def old_make_attn_head(in_ch, bot_ch, out_ch):
     attn = nn.Sequential(
         nn.Conv2d(in_ch, bot_ch, kernel_size=3, padding=1, bias=False),
-        Norm2d(bot_ch),
+        nn.BatchNorm2d(bot_ch),
         nn.ReLU(inplace=True),
         nn.Conv2d(bot_ch, bot_ch, kernel_size=3, padding=1, bias=False),
-        Norm2d(bot_ch),
+        nn.BatchNorm2d(bot_ch),
         nn.ReLU(inplace=True),
         nn.Conv2d(bot_ch, out_ch, kernel_size=out_ch, bias=False),
         nn.Sigmoid())
