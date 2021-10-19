@@ -29,7 +29,7 @@ def train(model, gpu=False):
     
     positive_pixel_weight = target_size / target_sum
 
-    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(positive_pixel_weight))
+    criterion = nn.BCEWithLogitsLoss(pos_weight=positive_pixel_weight)
 
     optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
 
@@ -122,9 +122,8 @@ def evaluate(model, criterion, device):
 
             loss = criterion(output, target)
             
-            target = target.unsqueeze(-1)
-            output = output.max(dim=1)[0].unsqueeze(-1)
-            
+            output = torch.sigmoid(output)
+
             test_epoch_iou_5 += IoU(output, target, 0.5)/len(test_data)
             test_epoch_iou_7 += IoU(output, target, 0.7)/len(test_data)
             test_epoch_loss += loss.item()/len(test_data)
