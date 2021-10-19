@@ -51,9 +51,6 @@ class Decoder2D(nn.Module):
         x = self.decoder_3(x)
         x = self.decoder_4(x)
         x = self.final_out(x)
-
-        x = torch.sigmoid(x)
-
         return x
 
 class BeitSegmentationModel(nn.Module):
