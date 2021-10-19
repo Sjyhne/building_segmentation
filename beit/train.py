@@ -68,6 +68,8 @@ def train(model, gpu=False):
             loss.backward()
             optimizer.step()
 
+            output = torch.sigmoid(output)
+
             epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data), 4)
             epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data), 4)
             epoch_loss += round(loss.item()/len(training_data), 4)
@@ -145,7 +147,7 @@ if __name__ == "__main__":
     
     real_images, real_target_images = test_data.get_images(0)
 
-    output_images = torch.nn.functional.softmax(model(source_images), dim=3).max(dim=3)[0].unsqueeze(3)
+    output_images = model(source_images)
 
     f, axarr = plt.subplots(1, 3)
     

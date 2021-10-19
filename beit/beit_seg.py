@@ -1,12 +1,10 @@
-from transformers import BeitModel, BeitFeatureExtractor
+from transformers import BeitModel
 from torch import nn
-import torch
 
 import matplotlib.pyplot as plt
 
 from PIL import Image
 import requests
-import time
 
 """
 Picked at https://github.com/920232796/SETR-pytorch/blob/master/SETR/transformer_seg.py

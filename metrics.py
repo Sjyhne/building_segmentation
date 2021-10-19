@@ -34,9 +34,6 @@ def soft_dice_loss(output_image, target_image, epsilon=1e-6):
 
     output_image, target_image = output_image.cpu().detach().numpy(), target_image.cpu().detach().numpy()
 
-    print("output max:", np.max(output_image), "| output min:", np.min(output_image))
-    print("target max:", np.max(target_image), "| target min:", np.min(target_image))
-
     axes = tuple(range(1, len(output_image.shape) - 1))
     numerator = 2. * np.sum(output_image * target_image, axes)
     denominator = np.sum(np.square(output_image) + np.square(target_image), axes)
