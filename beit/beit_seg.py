@@ -13,7 +13,7 @@ class Decoder2D(nn.Module):
 
     # TODO: Maybe add dropout? Not sure if it is needed.
 
-    def __init__(self, in_channels, out_channels, features=[64, 32, 16, 8]):
+    def __init__(self, in_channels, out_channels, features=[512, 256, 128, 64]):
         super().__init__()
         self.decoder_1 = nn.Sequential(
             nn.Conv2d(in_channels, features[0], 2, padding=0),

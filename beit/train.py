@@ -2,6 +2,8 @@ import sys
 import os.path
 import json
 
+import wandb
+
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 
@@ -19,31 +21,25 @@ from metrics import IoU, soft_dice_loss
 def weighted_mse_loss(input, target, weight):
     return torch.sum(weight * (input - target) ** 2)
 
-def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=0.4, batch_size=64)
+def train(model, config):
+
+    training_data = get_dataset("training", data_percentage=config["data_percentage"], batch_size=config["batch_size"])
     print("Len training_data:", len(training_data))
-    
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print("Using:", device)
-    
-    #target_size, target_sum = 0, 0
 
-    #for _, target in training_data:
-    #    target_size += np.prod(target.shape)
-    #    target_sum += target.sum()
-    
-    #class_weights = torch.tensor([1 - (target_size/target_sum), target_size/target_sum]).float().to(device)
+    print("Currently using:", config["device"])
 
     criterion = nn.MSELoss()
 
     optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
     
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.3)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=config["scheduler_stepsize"], gamma=config["scheduler_gamma"])
 
-    n_epochs = 200
+    n_epochs = config["epochs"]
 
     model = model.to(device)
+
+    wandb.watch(model, criterion=criterion, log="gradients", log_graph=True)
 
     log = {"total_loss": [], "total_iou_5": [], "total_dice": [], "test_total_loss": [], "test_total_iou_5": [], "test_total_dice": []}
 
@@ -85,7 +81,7 @@ def train(model, gpu=False):
         epoch_loss = epoch_loss/len(training_data)
         epoch_dice = epoch_dice/len(training_data)
 
-        print('[%d]\n Training -> loss: %.3f, iou 0.5: %.3f, dice: %.3f, lr: %.9f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_dice, scheduler.get_last_lr()[0]))
+        print('[%d]\n Training -> loss: %.3f, iou 0.5: %.3f, dice: %.3f, lr: %.7f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_dice, scheduler.get_last_lr()[0]))
 
         log["total_iou_5"].append(epoch_iou_5)
         log["total_loss"].append(epoch_loss)
@@ -128,6 +124,8 @@ def evaluate(model, criterion, device):
 
             loss = criterion(output, target)
 
+            wandb.log({"loss": loss})
+
             output = output.reshape(output.shape[0], output.shape[2], output.shape[3], output.shape[1])
             target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
             
@@ -140,15 +138,38 @@ def evaluate(model, criterion, device):
 
 if __name__ == "__main__":
 
-    model = BeitSegmentationModel(lr=0.04, num_classes=1)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = model
-    model = train(model)
+    config = wandb.config = {
+        "learning_rate": 0.01,
+        "epochs": 10,
+        "batch_size": 16,
+        "scheduler_stepsize": 10//10,
+        "scheduler_gamma": 0.6,
+        "device": (torch.device("cuda:0" if torch.cuda.is_available() else "cpu")),
+        "data_percentage": 0.005,
+        "num_classes": 1
+    }
+
+    wandb.init(project="beit-kaggle-dataset-local-machine", entity="sjyhne", config=config)
+
+    model = BeitSegmentationModel(lr=wandb.config["learning_rate"], num_classes=config["num_classes"])
+
+    model = train(model, config)
 
     test_data = get_dataset("test")
 
+    training_data = get_dataset("training")
+
+    training_source_images, training_target_images = training_data[0]
+    training_source_images, training_target_images = training_source_images.to("cpu").float(), training_target_images.to("cpu").float()
+
+    training_real_images, target_real_images = training_data.get_images(0)
+
+    training_output_images = model(training_source_images)
+
     source_images, target_images = test_data[0]
-    source_images, target_images = source_images.to("cuda:0").float(), target_images.to("cuda:0").long()
+    source_images, target_images = source_images.to("cpu").float(), target_images.to("cpu").long()
     
     real_images, real_target_images = test_data.get_images(0)
 
@@ -163,3 +184,14 @@ if __name__ == "__main__":
         axarr[2].imshow(real_target_images[i])
 
         plt.savefig(f"comparisons/comparison_test_{i}.png")
+    
+    f, axarr = plt.subplots(1, 3)
+    
+    for i in range(len(training_output_images)):
+        
+        axarr[0].imshow(training_output_images[i].cpu().detach().numpy())
+        axarr[1].imshow(training_real_images[i])
+        axarr[2].imshow(target_real_images[i])
+
+        plt.savefig(f"comparisons/comparison_test_{i}.png")
+

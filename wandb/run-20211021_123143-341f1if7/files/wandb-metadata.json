@@ -1,0 +1,22 @@
+{
+    "os": "Linux-5.11.0-38-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "heartbeatAt": "2021-10-21T10:31:47.433814",
+    "startedAt": "2021-10-21T10:31:43.851913",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "beit/train.py",
+    "codePath": "beit/train.py",
+    "git": {
+        "remote": "git@github.com:sjyhne/building_segmentation",
+        "commit": "b798f5b1ff910ace3f5cbef22ab8f5181d3fea6e"
+    },
+    "email": "sandsjyhne@gmail.com",
+    "root": "/home/sj/kartai/building_segmentation",
+    "host": "sj",
+    "username": "sj",
+    "executable": "/home/sj/kartai/building_segmentation/env/bin/python"
+}
