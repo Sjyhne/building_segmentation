@@ -14,32 +14,26 @@ def IoU(output_image, target_image, threshold):
 
     output_image = output_image.cpu().detach().numpy()
     target_image = target_image.cpu().detach().numpy()
-
-    if threshold == 0.5:
-        output_image = np.round(output_image)
-    else:
-        output_image = np.where(output_image >= threshold, int(1), int(0))
-
+    
+    output_image = np.where(output_image > threshold, int(1), int(0))
+    
     intersection = np.logical_and(output_image, target_image)
-
     union = np.logical_or(output_image, target_image)
-
     iou = np.sum(intersection) / np.sum(union)
-
-
+    
     return iou if iou != np.nan else 0.0
 
 
 def soft_dice_loss(output_image, target_image, epsilon=1e-6):
-
+    
     output_image, target_image = output_image.cpu().detach().numpy(), target_image.cpu().detach().numpy()
-
+    
     axes = tuple(range(1, len(output_image.shape) - 1))
     numerator = 2. * np.sum(output_image * target_image, axes)
     denominator = np.sum(np.square(output_image) + np.square(target_image), axes)
+    soft_dice_loss = 1 - np.mean((numerator + epsilon) / (denominator + epsilon))
 
-    return 1 - np.mean((numerator + epsilon) / (denominator + epsilon))
-
+    return soft_dice_loss
 
 if __name__ == "__main__":
 

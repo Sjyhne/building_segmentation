@@ -12,88 +12,92 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
-from torch.optim import RMSprop
-
-
 from data_generator import get_dataset
 from beit_seg import BeitSegmentationModel
 from metrics import IoU, soft_dice_loss
 
+def weighted_mse_loss(input, target, weight):
+    return torch.sum(weight * (input - target) ** 2)
 
 def train(model, gpu=False):
 
-    training_data = get_dataset("training", data_percentage=1.0, batch_size=16)
+    training_data = get_dataset("training", data_percentage=0.4, batch_size=64)
     print("Len training_data:", len(training_data))
     
-    target_size, target_sum = 0, 0
-
-    for _, target in training_data:
-        target_size += np.prod(target.shape)
-        target_sum += target.sum()
-    
-    positive_pixel_weight = target_size / target_sum
-
-    criterion = RMSprop()
-
-    optimizer = optim.AdamW(params=model.decoder.parameters(), lr=model.lr)
-
-    # Training loop
-
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using:", device)
+    
+    #target_size, target_sum = 0, 0
 
-    n_epochs = 100
+    #for _, target in training_data:
+    #    target_size += np.prod(target.shape)
+    #    target_sum += target.sum()
+    
+    #class_weights = torch.tensor([1 - (target_size/target_sum), target_size/target_sum]).float().to(device)
+
+    criterion = nn.MSELoss()
+
+    optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
+    
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.3)
+
+    n_epochs = 200
 
     model = model.to(device)
 
-    log = {"total_loss": [], "total_iou_5": [], "total_iou_7": [], "total_dice": [], "test_total_loss": [], "test_total_iou_5": [], "test_total_iou_7": [], "test_total_dice": []}
+    log = {"total_loss": [], "total_iou_5": [], "total_dice": [], "test_total_loss": [], "test_total_iou_5": [], "test_total_dice": []}
 
     for _, epoch in tqdm(enumerate(range(n_epochs)), desc="Training loop", total=n_epochs):
         epoch_loss = 0
         epoch_iou_5 = 0
-        epoch_iou_7 = 0
         epoch_dice = 0
         for i in range(len(training_data)):
             source, target = training_data[i]
 
-            source = source.to(device)
-            target = target.to(device)
+            source = source.to(device).float()
+            target = target.to(device).float()
 
             optimizer.zero_grad()
 
-            output = model(source)
-
-            oshape = output.shape
-
-            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
-
+            output = torch.sigmoid(model(source))
+            
+            output = output.reshape(output.shape[0], output.shape[3], output.shape[1], output.shape[2])
+            target = target.reshape(target.shape[0], target.shape[1], target.shape[2], target.shape[3])
+            
             loss = criterion(output, target)
-
+            
             loss.backward()
             optimizer.step()
 
-            output = torch.sigmoid(output)
+            output = output.reshape(output.shape[0], output.shape[2], output.shape[3], output.shape[1])
+            target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
+            
+            epoch_iou_5 += round(IoU(output, target, 0.5), 4)
+            epoch_loss += round(loss.item(), 4)
+            epoch_dice += round(soft_dice_loss(output, target), 4)
+            
+            #lr_scheduler.step(epoch + i / len(training_data))
+        
+        scheduler.step()
+        
+        #lr = lr_scheduler.get_last_lr()[0]
+        epoch_iou_5 = epoch_iou_5/len(training_data)
+        epoch_loss = epoch_loss/len(training_data)
+        epoch_dice = epoch_dice/len(training_data)
 
-            epoch_iou_5 += round(IoU(output, target, 0.5)/len(training_data), 4)
-            epoch_iou_7 += round(IoU(output, target, 0.7)/len(training_data), 4)
-            epoch_loss += round(loss.item()/len(training_data), 4)
-            epoch_dice += round(soft_dice_loss(output, target)/len(training_data), 4)
-
-        print('[%d]\n Training -> loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f, dice: %.3f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_iou_7, epoch_dice))
+        print('[%d]\n Training -> loss: %.3f, iou 0.5: %.3f, dice: %.3f, lr: %.9f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_dice, scheduler.get_last_lr()[0]))
 
         log["total_iou_5"].append(epoch_iou_5)
-        log["total_iou_7"].append(epoch_iou_7)
         log["total_loss"].append(epoch_loss)
         log["total_dice"].append(epoch_dice)
 
-        test_loss, test_iou_5, test_iou_7, test_dice = evaluate(model, criterion, device)
+        test_loss, test_iou_5, test_dice = evaluate(model, criterion, device)
         
         log["test_total_iou_5"].append(test_iou_5)
-        log["test_total_iou_7"].append(test_iou_7)
         log["test_total_loss"].append(test_loss)
         log["test_total_dice"].append(test_dice)
         
-        print('Test -> loss: %.3f, iou 0.5: %.3f, iou 0.7: %.3f, dice: %.3f' % (test_loss, test_iou_5, test_iou_7, test_dice))
+        print('Test -> loss: %.3f, iou 0.5: %.3f, dice: %.3f' % (test_loss, test_iou_5, test_dice))
 
 
     with open("metrics.json", "w") as file:
@@ -110,43 +114,41 @@ def evaluate(model, criterion, device):
 
     test_epoch_loss = 0
     test_epoch_iou_5 = 0
-    test_epoch_iou_7 = 0
     test_epoch_dice = 0
 
     with torch.no_grad():
         for i in range(len(test_data)):
             source, target = test_data[i]
-            source, target = source.to(device), target.to(device)
+            source, target = source.to(device).float(), target.to(device).float()
 
-            output = model(source)
+            output = torch.sigmoid(model(source))
 
-            oshape = output.shape
-
-            output = output.reshape(oshape[0], oshape[3], oshape[1], oshape[2]).double()
+            output = output.reshape(output.shape[0], output.shape[3], output.shape[1], output.shape[2])
+            target = target.reshape(target.shape[0], target.shape[1], target.shape[2], target.shape[3])
 
             loss = criterion(output, target)
+
+            output = output.reshape(output.shape[0], output.shape[2], output.shape[3], output.shape[1])
+            target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
             
-            output = torch.sigmoid(output)
+            test_epoch_iou_5 += IoU(output, target, 0.5)
+            test_epoch_loss += loss.item()
+            test_epoch_dice += soft_dice_loss(output, target)
 
-            test_epoch_iou_5 += IoU(output, target, 0.5)/len(test_data)
-            test_epoch_iou_7 += IoU(output, target, 0.7)/len(test_data)
-            test_epoch_loss += loss.item()/len(test_data)
-            test_epoch_dice += soft_dice_loss(output, target)/len(test_data)
+    return round(test_epoch_loss/len(test_data), 4), round(test_epoch_iou_5/len(test_data), 4), round(test_epoch_dice/len(test_data), 4)
 
-    return round(test_epoch_loss, 4), round(test_epoch_iou_5, 4), round(test_epoch_iou_7, 4), round(test_epoch_dice, 4)
-    ...
 
 if __name__ == "__main__":
 
-    model = BeitSegmentationModel(lr=0.0001, num_classes=1)
+    model = BeitSegmentationModel(lr=0.04, num_classes=1)
 
-    model = model.double()
+    model = model
     model = train(model)
 
     test_data = get_dataset("test")
 
     source_images, target_images = test_data[0]
-    source_images, target_images = source_images.to("cuda:0"), target_images.to("cuda:0")
+    source_images, target_images = source_images.to("cuda:0").float(), target_images.to("cuda:0").long()
     
     real_images, real_target_images = test_data.get_images(0)
 

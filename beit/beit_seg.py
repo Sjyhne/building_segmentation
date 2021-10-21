@@ -13,7 +13,7 @@ class Decoder2D(nn.Module):
 
     # TODO: Maybe add dropout? Not sure if it is needed.
 
-    def __init__(self, in_channels, out_channels, features=[512, 256, 128, 64]):
+    def __init__(self, in_channels, out_channels, features=[64, 32, 16, 8]):
         super().__init__()
         self.decoder_1 = nn.Sequential(
             nn.Conv2d(in_channels, features[0], 2, padding=0),
@@ -60,7 +60,7 @@ class BeitSegmentationModel(nn.Module):
         img_size=224,
         patch_dim=16,
         num_channels=3,
-        num_classes=1,
+        num_classes=2,
         batch_size=16,
         pretrained_model="microsoft/beit-base-patch16-224-pt22k-ft22k"
     ):
@@ -94,16 +94,9 @@ class BeitSegmentationModel(nn.Module):
             * attentions
         """
 
-        encoder_output = self.beit_base(pixel_values=x)        
+        encoder_output = self.beit_base(pixel_values=x)[1].reshape(self.batch_size, self.num_channels, self.patch_dim, self.patch_dim)
         
-        pooler_output = encoder_output.pooler_output.reshape(
-            self.batch_size,
-            self.num_channels,
-            self.patch_dim,
-            self.patch_dim
-        )
-
-        return pooler_output
+        return encoder_output
 
     def forward(self, x):
 

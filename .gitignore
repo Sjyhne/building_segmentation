@@ -1,5 +1,4 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
 *.py[cod]
 *$py.class
 
@@ -133,3 +132,5 @@ shadow_removal
 features
 data.zip
 comparisons
+github_token
+metrics*

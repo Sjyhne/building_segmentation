@@ -74,7 +74,6 @@ class AerialImages(Dataset):
             self.batch_label_paths.append(self.label_paths[i * self.batch_size:(i + 1)*self.batch_size])
 
     def get_channel_means(self):
-        print("Getting channel means...")
 
         r, g, b = 0, 0, 0
         
@@ -85,11 +84,9 @@ class AerialImages(Dataset):
             b += np.mean(img[:, :, 2])
         
         r, g, b = r/len(self.source_image_paths), g/len(self.source_image_paths), b/len(self.source_image_paths)
-        print("Done getting channel means...\n")
         return [r, g, b]
 
     def get_channel_stds(self):
-        print("Getting channel stds...")
 
         r_std, g_std, b_std = 0, 0, 0
 
@@ -100,7 +97,6 @@ class AerialImages(Dataset):
             b_std += np.sum([np.square(np.absolute(b - self.channel_means[2])) for b in img[:, :, 2]])/(img.shape[0] * img.shape[1])
 
         r_std, g_std, b_std = np.sqrt(r_std/len(self.source_image_paths)), np.sqrt(g_std/len(self.source_image_paths)), np.sqrt(b_std/len(self.source_image_paths))
-        print("Done getting channel stds...\n")
         return [r_std, g_std, b_std]
 
     def _get_features(self,
@@ -171,8 +167,6 @@ class AerialImages(Dataset):
                 torch.save(torch.from_numpy(all_labels[index]).double(), os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
             
             print("Finished creating features and storing labels and features")
-        else:
-            print("Features and labels already created and stored")
 
         feature_paths = []
         for path in sorted(os.listdir(feature_dir)):
