@@ -28,8 +28,18 @@ def train(model, config):
     print("Len training_data:", len(training_data))
 
     print("Currently using:", config["device"])
-
-    criterion = nn.MSELoss()
+    
+    target_prod = 0
+    target_size = 0
+    
+    for _, target in training_data:
+        target_prod += target.sum()
+        target_size += target.numel()
+    
+    
+    weight = target_prod / target_size
+    
+    criterion = nn.CrossEntropyLoss(weight=torch.tensor([1 - weight, weight]).float().to(device))
 
     optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
     
@@ -51,22 +61,27 @@ def train(model, config):
             source, target = training_data[i]
 
             source = source.to(device).float()
-            target = target.to(device).float()
+            target = target.to(device).long()
 
             optimizer.zero_grad()
 
-            output = torch.sigmoid(model(source))
+            output = model(source)
             
-            output = output.reshape(output.shape[0], output.shape[3], output.shape[1], output.shape[2])
-            target = target.reshape(target.shape[0], target.shape[1], target.shape[2], target.shape[3])
+            oshape = output.shape
+            tshape = target.shape
+            
+            output = output.reshape(output.shape[0] * output.shape[1] * output.shape[2], output.shape[3])
+            target = target.reshape(target.shape[0] * target.shape[1] * target.shape[2] * target.shape[3])
             
             loss = criterion(output, target)
             
             loss.backward()
             optimizer.step()
 
-            output = output.reshape(output.shape[0], output.shape[2], output.shape[3], output.shape[1])
-            target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
+            output = output.reshape(oshape[0], oshape[1], oshape[2], oshape[3])
+            target = target.reshape(tshape[0], tshape[2], tshape[3], tshape[1])
+            
+            output = torch.softmax(output, dim=3).argmax(-1).unsqueeze(-1)
             
             epoch_iou_5 += round(IoU(output, target, 0.5), 4)
             epoch_loss += round(loss.item(), 4)
@@ -74,7 +89,7 @@ def train(model, config):
             
             #lr_scheduler.step(epoch + i / len(training_data))
         
-        scheduler.step()
+        scheduler.step(epoch)
         
         #lr = lr_scheduler.get_last_lr()[0]
         epoch_iou_5 = epoch_iou_5/len(training_data)
@@ -92,6 +107,15 @@ def train(model, config):
         log["test_total_iou_5"].append(test_iou_5)
         log["test_total_loss"].append(test_loss)
         log["test_total_dice"].append(test_dice)
+        
+        
+        wandb.log({"Training loss": epoch_loss})
+        wandb.log({"Training iou": epoch_iou_5})
+        wandb.log({"Training dice": epoch_dice})
+        wandb.log({"Test loss": test_loss})
+        wandb.log({"Test iou": test_iou_5})
+        wandb.log({"Test dice": test_dice})
+        wandb.log({"Learning rate": scheduler.get_last_lr()[0]})
         
         print('Test -> loss: %.3f, iou 0.5: %.3f, dice: %.3f' % (test_loss, test_iou_5, test_dice))
 
@@ -115,19 +139,22 @@ def evaluate(model, criterion, device):
     with torch.no_grad():
         for i in range(len(test_data)):
             source, target = test_data[i]
-            source, target = source.to(device).float(), target.to(device).float()
+            source, target = source.to(device).float(), target.to(device).long()
 
-            output = torch.sigmoid(model(source))
+            output = model(source)
 
-            output = output.reshape(output.shape[0], output.shape[3], output.shape[1], output.shape[2])
-            target = target.reshape(target.shape[0], target.shape[1], target.shape[2], target.shape[3])
+            oshape = output.shape
+            tshape = target.shape
+            
+            output = output.reshape(output.shape[0] * output.shape[1] * output.shape[2], output.shape[3])
+            target = target.reshape(target.shape[0] * target.shape[1] * target.shape[2] * target.shape[3])
 
             loss = criterion(output, target)
 
-            wandb.log({"loss": loss})
-
-            output = output.reshape(output.shape[0], output.shape[2], output.shape[3], output.shape[1])
-            target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
+            output = output.reshape(oshape[0], oshape[1], oshape[2], oshape[3])
+            target = target.reshape(tshape[0], tshape[2], tshape[3], tshape[1])
+            
+            output = torch.softmax(output, dim=3).argmax(-1).unsqueeze(-1)
             
             test_epoch_iou_5 += IoU(output, target, 0.5)
             test_epoch_loss += loss.item()
@@ -139,19 +166,21 @@ def evaluate(model, criterion, device):
 if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
+    epochs = 300
 
     config = wandb.config = {
-        "learning_rate": 0.01,
-        "epochs": 10,
-        "batch_size": 16,
-        "scheduler_stepsize": 10//10,
-        "scheduler_gamma": 0.6,
+        "learning_rate": 0.05,
+        "epochs": epochs,
+        "batch_size": 8,
+        "scheduler_stepsize": epochs//15,
+        "scheduler_gamma": 0.4,
         "device": (torch.device("cuda:0" if torch.cuda.is_available() else "cpu")),
-        "data_percentage": 0.005,
-        "num_classes": 1
+        "data_percentage": 0.01,
+        "num_classes": 2
     }
 
-    wandb.init(project="beit-kaggle-dataset-local-machine", entity="sjyhne", config=config)
+    wandb.init(project="beit-kaggle-dataset-uia-server", entity="sjyhne", config=config)
 
     model = BeitSegmentationModel(lr=wandb.config["learning_rate"], num_classes=config["num_classes"])
 
@@ -162,18 +191,21 @@ if __name__ == "__main__":
     training_data = get_dataset("training")
 
     training_source_images, training_target_images = training_data[0]
-    training_source_images, training_target_images = training_source_images.to("cpu").float(), training_target_images.to("cpu").float()
+    training_source_images, training_target_images = training_source_images.to("cuda:0").float(), training_target_images.to("cuda:0").long()
 
     training_real_images, target_real_images = training_data.get_images(0)
 
     training_output_images = model(training_source_images)
 
     source_images, target_images = test_data[0]
-    source_images, target_images = source_images.to("cpu").float(), target_images.to("cpu").long()
+    source_images, target_images = source_images.to("cuda:0").float(), target_images.to("cuda:0").long()
     
     real_images, real_target_images = test_data.get_images(0)
 
     output_images = model(source_images)
+    
+    output_images = torch.softmax(output_images, dim=-1)[:, :, :, 1]
+    training_output_images = torch.softmax(training_output_images, dim=-1)[:, :, :, 1]
 
     f, axarr = plt.subplots(1, 3)
     
@@ -193,5 +225,5 @@ if __name__ == "__main__":
         axarr[1].imshow(training_real_images[i])
         axarr[2].imshow(target_real_images[i])
 
-        plt.savefig(f"comparisons/comparison_test_{i}.png")
+        plt.savefig(f"comparisons/comparison_training_{i}.png")
 
