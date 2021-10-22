@@ -135,3 +135,4 @@ comparisons
 github_token
 metrics*
 wandb
+training_data

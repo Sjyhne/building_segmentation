@@ -285,20 +285,4 @@ class AerialImages(Dataset):
 
 if __name__ == "__main__":
 
-    data = get_dataset("validation")
-    """
-    source_tensor, target_tensor = data[0]
-    source_img, target_img = data.get_images(0)
-
-    f, axarr = plt.subplots(1, 2)
-    
-    print(source_img[0])
-    print(target_img[0])
-    print(source_img.shape)
-    print(target_img.shape)
-
-    axarr[0].imshow(source_img[0].reshape(224, 224, 3))
-    axarr[1].imshow(target_img[0].reshape(224, 224, 1))
-
-    plt.show()
-    """
+    ...
