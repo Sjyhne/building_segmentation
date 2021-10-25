@@ -7,6 +7,8 @@ import wandb
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 
+from rmi import RMILoss
+
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -36,9 +38,12 @@ def train(model, training_data, test_data, config):
     
     weight = target_prod / target_size
     
-    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([weight]).float().to(device))
-    optimizer = optim.Adam(params=model.decoder.parameters(), lr=model.lr)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=config["scheduler_stepsize"], gamma=config["scheduler_gamma"])
+    #criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([weight]).float().to(device))
+    criterion = nn.MSELoss()
+    #criterion = DiceLoss()
+    #criterion = RMILoss(with_logits=False)
+    optimizer = optim.AdamW(params=model.decoder.parameters(), lr=model.lr)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, T_mult=2, eta_min=0.00001, last_epoch=-1)
 
     iou_loss, dice_loss = IoULoss(), DiceLoss()
 
@@ -46,7 +51,7 @@ def train(model, training_data, test_data, config):
 
     model = model.to(device)
 
-    wandb.watch(model, criterion=criterion, log="gradients", log_graph=True)
+    wandb.watch(model, criterion=criterion)
 
     log = {"total_loss": [], "total_iou_5": [], "total_dice": [], "test_total_loss": [], "test_total_iou_5": [], "test_total_dice": []}
 
@@ -65,12 +70,12 @@ def train(model, training_data, test_data, config):
             output = model(source)
             
             target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
-
-            loss = criterion(output, target)
+            
+            loss = criterion(torch.sigmoid(output), target)
             
             loss.backward()
             optimizer.step()
-
+                        
             output = torch.sigmoid(output)
             
             epoch_iou_5 += iou_loss(output, target).cpu().detach().numpy()
@@ -79,7 +84,6 @@ def train(model, training_data, test_data, config):
             
         scheduler.step()
         
-        #lr = lr_scheduler.get_last_lr()[0]
         epoch_iou_5 = epoch_iou_5/len(training_data)
         epoch_loss = epoch_loss/len(training_data)
         epoch_dice = epoch_dice/len(training_data)
@@ -129,15 +133,15 @@ def evaluate(model, criterion, test_data, device):
         for i in range(len(test_data)):
             source, target = test_data[i]
             source, target = source.to(device).float(), target.to(device).float()
-
+            
             output = model(source)
 
             target = target.reshape(target.shape[0], target.shape[2], target.shape[3], target.shape[1])
-            
-            loss = criterion(output, target)
+                        
+            loss = criterion(torch.sigmoid(output), target)
 
             output = torch.sigmoid(output)
-
+            
             test_epoch_iou_5 += iou_loss(output, target).cpu().detach().numpy()
             test_epoch_loss += loss.item()
             test_epoch_dice += dice_loss(output, target).cpu().detach().numpy()
@@ -149,22 +153,20 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
-    epochs = 1
+    epochs = 500
 
     config = wandb.config = {
-        "learning_rate": 0.05,
+        "learning_rate": 0.01,
         "epochs": epochs,
-        "scheduler_stepsize": epochs//1,
-        "scheduler_gamma": 0.4,
         "device": (torch.device("cuda:0" if torch.cuda.is_available() else "cpu")),
         "num_classes": 1,
         "training": {
-            "batch_size": 16,
-            "data_percentage": 0.01
+            "batch_size": 64,
+            "data_percentage": 1.0
         },
         "test": {
-            "batch_size": 16,
-            "data_percentage": 0.01
+            "batch_size": 64,
+            "data_percentage": 1.0
         }
     }
 
@@ -177,6 +179,8 @@ if __name__ == "__main__":
     training_data = get_dataset("training", config["training"]["data_percentage"], config["training"]["batch_size"])
 
     model = train(model, training_data, test_data, config)
+    
+    torch.save(model.state_dict(), "./model.pth")
 
     training_source_images, training_target_images = training_data[0]
     training_source_images, training_target_images = training_source_images.to(config["device"]).float(), training_target_images.to(config["device"]).float()
@@ -194,7 +198,7 @@ if __name__ == "__main__":
     
     output_images = torch.sigmoid(output_images)
     training_output_images = torch.sigmoid(training_output_images)
-
+        
     f, axarr = plt.subplots(1, 3)
     
     for i in range(len(output_images)):

@@ -19,26 +19,26 @@ class Decoder2D(nn.Module):
             nn.Conv2d(in_channels, features[0], 2, padding=0),
             nn.BatchNorm2d(features[0]),
             nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
         )
         self.decoder_2 = nn.Sequential(
             nn.Conv2d(features[0], features[1], 2, padding=0),
             nn.BatchNorm2d(features[1]),
             nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
         )
         self.decoder_3 = nn.Sequential(
             nn.Conv2d(features[1], features[2], 2, padding=0),
             nn.BatchNorm2d(features[2]),
             nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
         )
 
         self.decoder_4 = nn.Sequential(
             nn.Conv2d(features[2], features[3], 2, padding=0),
             nn.BatchNorm2d(features[3]),
             nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
         )
 
         self.final_out = (nn.Conv2d(features[-1], out_channels, 3, padding=0))
