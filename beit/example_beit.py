@@ -1,29 +1,27 @@
 from transformers import BeitFeatureExtractor, BeitModel
 from PIL import Image
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 import requests
+
+import torchvision
 
 url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
 url1 = "http://images.cocodataset.org/test-stuff2017/000000000001.jpg"
 image = Image.open(requests.get(url, stream=True).raw)
 image1 = Image.open(requests.get(url, stream=True).raw)
 
-feature_extractor = BeitFeatureExtractor.from_pretrained('microsoft/beit-base-patch16-224-pt22k-ft22k')
-model = BeitModel.from_pretrained('microsoft/beit-base-patch16-224-pt22k-ft22k', output_attentions=True)
-images = [image, image1]
-
-inputs = feature_extractor(images=images, return_tensors="pt")
-
-inputs2 = feature_extractor(images=images, return_tensors="pt")
 
 
-outputs = model(**inputs)
+transform = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
+    ),
+])
+normalized_img = transform(image)
 
-print(outputs.keys())
-
-last_hidden_states = outputs.last_hidden_state
-
-print(outputs.attentions)
-for att in outputs.attentions:
-    print(att.shape)
-print(len(outputs.attentions))
+plt.imshow(normalized_img)

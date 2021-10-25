@@ -14,6 +14,8 @@ import shutil
 from sys import platform
 from pathlib import Path, PureWindowsPath
 
+import torchvision
+
 main_dir = "./data/tiff"
 
 training_data_dir = [main_dir + "/train", main_dir + "/train_labels"]
@@ -132,11 +134,19 @@ class AerialImages(Dataset):
             self.channel_means = self.get_channel_means()
             self.channel_stds = self.get_channel_stds()
 
-            fe = BeitFeatureExtractor.from_pretrained(
-                feature_extractor_model,
-                image_mean=self.channel_means,
-                image_std=self.channel_stds
-            )
+            transform = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),
+                torchvision.transforms.Normalize(
+                    mean=self.channel_means,
+                    std=self.channel_stds,
+                ),
+            ])
+
+            #fe = BeitFeatureExtractor.from_pretrained(
+            #    feature_extractor_model,
+            #    image_mean=self.channel_means,
+            #    image_std=self.channel_stds
+            #)
 
             for _, i in tqdm(enumerate(range(len(source_image_paths))),
                              total=len(source_image_paths),
@@ -149,16 +159,14 @@ class AerialImages(Dataset):
                                                                                      large_target_image,
                                                                                      self.patch_size)
 
-                source_features = fe(images=source_image_patches, return_tensors="pt")["pixel_values"]
+                # Normalize the images
+                source_features = [transform(img) for img in source_image_patches]
 
                 all_features.extend(source_features)
                 all_labels.extend(target_image_patches)
 
                 all_features_images.extend(source_image_patches)
                 all_labels_images.extend(target_image_patches)
-            
-            # Releasing memory used by fe
-            del fe
 
             for _, index in tqdm(enumerate(range(len(all_features))), total=len(all_features), desc="Storing features and labels"):
                 np.save(os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), np.asarray(all_features_images[index]) / 255.0)
@@ -282,7 +290,23 @@ class AerialImages(Dataset):
         return feature_images, label_images
 
 
+class KartaiDataset(Dataset):
+    def __init__(self):
+        ...
+
+
+import json
 
 if __name__ == "__main__":
 
-    ...
+    data = get_dataset("test", 0.1, 4)
+
+    i, l = data[0]
+
+    
+    i, l = i.reshape(4, 224, 224, 3), l.reshape(4, 224, 224, 1)
+
+    f, a = plt.subplots(1, 2)
+    a[0].imshow((i[0] + 1)/2)
+    a[1].imshow(l[0])
+    plt.show()
