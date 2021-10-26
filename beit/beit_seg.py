@@ -13,25 +13,34 @@ class Decoder2D(nn.Module):
 
     # TODO: Maybe add dropout? Not sure if it is needed.
 
-    def __init__(self, in_channels, out_channels, features=[512, 256, 128, 64]):
+    def __init__(self, in_channels, out_channels, features=[256, 256, 128, 64]):
         super().__init__()
         self.decoder_1 = nn.Sequential(
             nn.Conv2d(in_channels, features[0], 2, padding=0),
             nn.BatchNorm2d(features[0]),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(features[0], features[0], 2, padding=0),
+            nn.BatchNorm2d(features[0]),
+            nn.ReLU(inplace=True),
         )
         self.decoder_2 = nn.Sequential(
             nn.Conv2d(features[0], features[1], 2, padding=0),
             nn.BatchNorm2d(features[1]),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(features[1], features[1], 2, padding=0),
+            nn.BatchNorm2d(features[1]),
+            nn.ReLU(inplace=True),
         )
         self.decoder_3 = nn.Sequential(
             nn.Conv2d(features[1], features[2], 2, padding=0),
             nn.BatchNorm2d(features[2]),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(features[2], features[2], 2, padding=0),
+            nn.BatchNorm2d(features[2]),
+            nn.ReLU(inplace=True),
         )
 
         self.decoder_4 = nn.Sequential(
@@ -39,6 +48,9 @@ class Decoder2D(nn.Module):
             nn.BatchNorm2d(features[3]),
             nn.ReLU(inplace=True),
             nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(features[3], features[3], 2, padding=0),
+            nn.BatchNorm2d(features[3]),
+            nn.ReLU(inplace=True),
         )
 
         self.final_out = (nn.Conv2d(features[-1], out_channels, 3, padding=0))

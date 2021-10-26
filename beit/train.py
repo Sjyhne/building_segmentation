@@ -27,21 +27,21 @@ def train(model, training_data, test_data, config):
     print("Len training_data:", len(training_data))
     print("Currently using:", config["device"])
     
-    target_prod = 0
-    target_size = 0
+    #target_prod = 0
+    #target_size = 0
     
-    for _, target in training_data:
-        target_prod += target.sum()
-        target_size += target.numel()
-    
-    weight = target_prod / target_size
+    #for _, target in training_data:
+    #    target_prod += target.sum()
+    #    target_size += target.numel()
+     
+    #weight = target_prod / target_size
     
     #criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([weight]).float().to(device))
     criterion = nn.MSELoss()
     #criterion = DiceLoss()
     #criterion = RMILoss(with_logits=False)
     optimizer = optim.AdamW(params=model.decoder.parameters(), lr=model.lr)
-    #scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=2, T_mult=1, eta_min=0.00001, last_epoch=-1)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5, T_mult=2, eta_min=0.0001, last_epoch=-1)
 
     iou_loss, dice_loss = IoULoss(), DiceLoss()
 
@@ -80,13 +80,13 @@ def train(model, training_data, test_data, config):
             epoch_loss += loss.item()
             epoch_dice += dice_loss(output, target).cpu().detach().numpy()
             
-        #scheduler.step()
+        scheduler.step()
         
         epoch_iou_5 = epoch_iou_5/len(training_data)
         epoch_loss = epoch_loss/len(training_data)
         epoch_dice = epoch_dice/len(training_data)
 
-        print('[%d]\n Training -> loss: %.3f, iou loss: %.3f, dice loss: %.3f, lr: %f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_dice, 0.01))
+        print('[%d]\n Training -> loss: %.3f, iou loss: %.3f, dice loss: %.3f, lr: %f' % (epoch + 1, epoch_loss, epoch_iou_5, epoch_dice, scheduler.get_last_lr()[0]))
 
         log["total_iou_5"].append(epoch_iou_5)
         log["total_loss"].append(epoch_loss)
@@ -105,7 +105,7 @@ def train(model, training_data, test_data, config):
         wandb.log({"Test loss": test_loss})
         wandb.log({"Test iou": test_iou_5})
         wandb.log({"Test dice": test_dice})
-        wandb.log({"Learning rate": 0.01})
+        wandb.log({"Learning rate": scheduler.get_last_lr()[0]})
         
         print('Test -> loss: %.3f, iou loss: %.3f, dice loss: %.3f' % (test_loss, test_iou_5, test_dice))
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
-    epochs = 3
+    epochs = 50
 
     config = wandb.config = {
         "learning_rate": 0.01,
@@ -159,12 +159,12 @@ if __name__ == "__main__":
         "device": (torch.device("cuda:0" if torch.cuda.is_available() else "cpu")),
         "num_classes": 1,
         "training": {
-            "batch_size": 8,
-            "data_percentage": 0.05
+            "batch_size": 64,
+            "data_percentage": 0.7
         },
         "test": {
-            "batch_size": 8,
-            "data_percentage": 0.05
+            "batch_size": 64,
+            "data_percentage": 0.7
         }
     }
 

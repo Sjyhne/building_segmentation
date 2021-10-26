@@ -1,12 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
+from numpy.lib.function_base import angle
 import torch
 
 from torch.utils.data import Dataset
 from PIL import Image
 from transformers import BeitFeatureExtractor
 from tqdm import tqdm
+from skimage.transform import rotate, AffineTransform, warp
+from skimage.util import random_noise
+from skimage.filters import gaussian
 
 import os
 import random
@@ -37,20 +41,21 @@ def get_image_paths(data_dir):
     return source_image_paths, target_image_paths
 
 
-def get_dataset(data_type, data_percentage=1.0, batch_size=16):
+def get_dataset(data_type, augmentation_techniques=[], data_percentage=1.0, batch_size=16):
     if data_type == "training":
-        return AerialImages(training_data_dir, data_type, data_percentage, batch_size=batch_size)
+        return AerialImages(training_data_dir, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
     elif data_type == "test":
-        return AerialImages(test_data_dir, data_type, data_percentage, batch_size=batch_size)
+        return AerialImages(test_data_dir, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
     elif data_type == "validation":
-        return AerialImages(validation_data_dir, data_type, data_percentage, batch_size=batch_size)
+        return AerialImages(validation_data_dir, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
     else:
         raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
 
 
 class AerialImages(Dataset):
-    def __init__(self, data_dir, data_type, data_percentage=1.0, transform=None, patch_size=(224, 224), batch_size=16, feature_extractor_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
-        self.transform = transform
+    def __init__(self, data_dir, data_type, data_percentage=1.0, augmentation_techniques=[], patch_size=(224, 224), batch_size=16, feature_extractor_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
+
+        self.augmentation_techniques = augmentation_techniques
 
         self.patch_size = patch_size
         self.batch_size = batch_size
@@ -80,7 +85,7 @@ class AerialImages(Dataset):
         r, g, b = 0, 0, 0
         
         for image_path in self.source_image_paths:
-            img = cv.imread(image_path)/255
+            img = cv.imread(image_path) / 255.0
             r += np.mean(img[:, :, 0])
             g += np.mean(img[:, :, 1])
             b += np.mean(img[:, :, 2])
@@ -93,13 +98,40 @@ class AerialImages(Dataset):
         r_std, g_std, b_std = 0, 0, 0
 
         for image_path in self.source_image_paths:
-            img = cv.imread(image_path)/255
+            img = cv.imread(image_path) / 255.0
             r_std += np.sum([np.square(np.absolute(r - self.channel_means[0])) for r in img[:, :, 0]])/(img.shape[0] * img.shape[1])
             g_std += np.sum([np.square(np.absolute(g - self.channel_means[1])) for g in img[:, :, 1]])/(img.shape[0] * img.shape[1])
             b_std += np.sum([np.square(np.absolute(b - self.channel_means[2])) for b in img[:, :, 2]])/(img.shape[0] * img.shape[1])
 
         r_std, g_std, b_std = np.sqrt(r_std/len(self.source_image_paths)), np.sqrt(g_std/len(self.source_image_paths)), np.sqrt(b_std/len(self.source_image_paths))
         return [r_std, g_std, b_std]
+    
+    def _augment_images(self, aug, images, labels):
+        
+        augmented_images = []
+        augmented_labels = []
+
+        if aug == "rt":
+            for i in range(len(images)):
+                for angle in [30, 60, 120, 150, 210, 240, 300, 330]:
+                    augmented_images.append(rotate(images[i], angle=angle, mode="wrap"))
+                    augmented_labels.append(rotate(labels[i], angle=angle, mode="wrap"))
+        elif aug == "fliplr":
+            for i in range(len(images)):
+                augmented_images.append(np.fliplr(images[i]))
+                augmented_labels.append(np.fliplr(labels[i]))
+        elif aug == "flipud":
+            for i in range(len(images)):
+                augmented_images.append(np.flipud(images[i]))
+                augmented_labels.append(np.flipud(labels[i]))
+        elif aug == "blur":
+            for i in range(len(images)):
+                augmented_images.append(gaussian(images[i], sigma=1, multichannel=True))
+            
+            augmented_labels = labels
+
+        return augmented_images, augmented_labels
+
 
     def _get_features(self,
                       source_image_paths,
@@ -115,8 +147,13 @@ class AerialImages(Dataset):
         all_features_images = []
         all_labels_images = []
 
-        target_dir = Path(os.path.join("features", feature_extractor_model, data_type))
-        feature_dir = Path(os.path.join(target_dir, "features"))
+        if len(self.augmentation_techniques) != 0:
+            target_dir = Path(os.path.join("features", feature_extractor_model, data_type + "_" + "_".join(sorted(self.augmentation_techniques))))
+        else:
+            target_dir = Path(os.path.join("features", feature_extractor_model, data_type))
+
+
+        feature_dir = Path(os.path.join(target_dir), "features")
         label_dir = Path(os.path.join(target_dir, "labels"))
 
         if platform == "win32":
@@ -131,16 +168,19 @@ class AerialImages(Dataset):
             os.mkdir(feature_dir)
             os.mkdir(label_dir)
 
-            self.channel_means = self.get_channel_means()
-            self.channel_stds = self.get_channel_stds()
+            #self.channel_means = self.get_channel_means()
+            #self.channel_stds = self.get_channel_stds()
 
-            transform = torchvision.transforms.Compose([
-                torchvision.transforms.ToTensor(),
-                torchvision.transforms.Normalize(
-                    mean=self.channel_means,
-                    std=self.channel_stds,
-                ),
-            ])
+            #print(self.channel_means)
+            #print(self.channel_stds)
+
+            #transform = torchvision.transforms.Compose([
+            #    torchvision.transforms.ToTensor(),
+            #    torchvision.transforms.Normalize(
+            #        mean=self.channel_means,
+            #        std=self.channel_stds,
+            #    ),
+            #])
 
             #fe = BeitFeatureExtractor.from_pretrained(
             #    feature_extractor_model,
@@ -153,14 +193,25 @@ class AerialImages(Dataset):
                              desc="Creating features and labels"
                              ):
                 large_source_image = cv.imread(source_image_paths[i])
-                large_target_image = cv.imread(target_image_paths[i]) / 255.0
+                large_target_image = cv.imread(target_image_paths[i])
 
                 source_image_patches, target_image_patches = self._get_image_patches(large_source_image,
                                                                                      large_target_image,
                                                                                      self.patch_size)
 
-                # Normalize the images
-                source_features = [transform(img) for img in source_image_patches]
+                source_image_patches = source_image_patches / 255.0
+                source_features = [img.reshape(self.patch_size[0], self.patch_size[1], 3) for img in source_image_patches]
+                source_features = [(img - np.min(img)) / (np.max(img) - np.min(img)) for img in source_features]
+
+                for aug in self.augmentation_techniques:
+                    augmented_images, augmented_labels = self._augment_images(aug, source_features, target_image_patches)
+                    all_features.extend(augmented_images)
+                    all_labels.extend(augmented_labels)
+
+                    augmented_images, augmented_labels = self._augment_images(aug, source_image_patches, target_image_patches)
+                    all_features_images.extend(augmented_images)
+                    all_labels_images.extend(augmented_labels)
+                    
 
                 all_features.extend(source_features)
                 all_labels.extend(target_image_patches)
@@ -169,10 +220,10 @@ class AerialImages(Dataset):
                 all_labels_images.extend(target_image_patches)
 
             for _, index in tqdm(enumerate(range(len(all_features))), total=len(all_features), desc="Storing features and labels"):
-                np.save(os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), np.asarray(all_features_images[index]) / 255.0)
+                np.save(os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), np.asarray(all_features_images[index]))
                 np.save(os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), all_labels_images[index].reshape(self.patch_size[0], self.patch_size[1], 1))
-                torch.save(all_features[index].double(), os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
-                torch.save(torch.from_numpy(all_labels[index]).double(), os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
+                torch.save(torch.DoubleTensor(all_features[index].reshape(3, self.patch_size[0], self.patch_size[1]).copy()), os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
+                torch.save(torch.DoubleTensor(all_labels[index].reshape(1, self.patch_size[0], self.patch_size[1]).copy()), os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
             
             print("Finished creating features and storing labels and features")
 
@@ -247,9 +298,7 @@ class AerialImages(Dataset):
                 target_patches[y, x] = target_patch
 
         source_patches = source_patches.reshape((source_patches.shape[0] * source_patches.shape[1]), source_patches.shape[2], source_patches.shape[3], source_patches.shape[4])
-        target_patches = target_patches.reshape((target_patches.shape[0] * target_patches.shape[1]), target_patches.shape[4], target_patches.shape[2], target_patches.shape[3])
-
-        source_patches = [Image.fromarray(np.uint8(arr)) for arr in source_patches]
+        target_patches = target_patches.reshape((target_patches.shape[0] * target_patches.shape[1]), target_patches.shape[2], target_patches.shape[3], target_patches.shape[4])
 
         return source_patches, target_patches
 
@@ -299,14 +348,20 @@ import json
 
 if __name__ == "__main__":
 
-    data = get_dataset("test", 0.1, 4)
+    data = get_dataset("test", ["flipud"])
 
     i, l = data[0]
+    image, label = data.get_images(0)
 
     
-    i, l = i.reshape(4, 224, 224, 3), l.reshape(4, 224, 224, 1)
+    i, l = i.reshape(16, 224, 224, 3), l.reshape(16, 224, 224, 1)
 
-    f, a = plt.subplots(1, 2)
-    a[0].imshow((i[0] + 1)/2)
-    a[1].imshow(l[0])
-    plt.show()
+    for idx in range(len(image)):
+        f, a = plt.subplots(1, 4)
+        print(i[idx])
+        print(type(i[idx]))
+        a[0].imshow(i[idx])
+        a[1].imshow(l[idx])
+        a[2].imshow(image[idx])
+        a[3].imshow(label[idx])
+        plt.show()
