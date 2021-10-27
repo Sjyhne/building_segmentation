@@ -18,6 +18,8 @@ from data_generator import get_dataset
 from beit_seg import BeitSegmentationModel
 from metrics import IoULoss, DiceLoss
 
+from lr_finder import LRFinder
+
 def weighted_mse_loss(input, target, weight):
     return torch.sum(weight * (input - target) ** 2)
 
@@ -36,20 +38,29 @@ def train(model, training_data, test_data, config):
      
     #weight = target_prod / target_size
     
+    #print("Positive class weight:", weight)
+    
     #criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([weight]).float().to(device))
     criterion = nn.MSELoss()
     #criterion = DiceLoss()
+    #criterion = IoULoss()
     #criterion = RMILoss(with_logits=False)
-    optimizer = optim.AdamW(params=model.decoder.parameters(), lr=model.lr)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=5, T_mult=2, eta_min=0.0001, last_epoch=-1)
+    optimizer = optim.AdamW(params=model.parameters(), lr=model.lr)
 
     iou_loss, dice_loss = IoULoss(), DiceLoss()
 
     n_epochs = config["epochs"]
 
-    model = model.to(device)
+    model = model.to(config["device"])
+    
+    #print("Finding the best LR")
+    
+    #lr_finder = LRFinder(model, optimizer, config["device"])
+    #lr_finder.range_test(training_data, end_lr=10, num_iter=1000, logwandb=True)
 
     wandb.watch(model, criterion=criterion)
+    
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200, eta_min=0.000005, last_epoch=-1)
 
     log = {"total_loss": [], "total_iou_5": [], "total_dice": [], "test_total_loss": [], "test_total_iou_5": [], "test_total_dice": []}
 
@@ -151,20 +162,20 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
-    epochs = 50
+    epochs = 200
 
     config = wandb.config = {
-        "learning_rate": 0.01,
+        "learning_rate": 0.0003,
         "epochs": epochs,
         "device": (torch.device("cuda:0" if torch.cuda.is_available() else "cpu")),
         "num_classes": 1,
         "training": {
-            "batch_size": 64,
-            "data_percentage": 0.7
+            "batch_size": 8,
+            "data_percentage": 0.2
         },
         "test": {
-            "batch_size": 64,
-            "data_percentage": 0.7
+            "batch_size": 8,
+            "data_percentage": 0.2
         }
     }
 
@@ -172,9 +183,9 @@ if __name__ == "__main__":
 
     model = BeitSegmentationModel(lr=wandb.config["learning_rate"], num_classes=config["num_classes"])
 
-    test_data = get_dataset("test", config["test"]["data_percentage"], config["test"]["batch_size"])
+    test_data = get_dataset("test", data_percentage=config["test"]["data_percentage"], batch_size=config["test"]["batch_size"])
 
-    training_data = get_dataset("training", config["training"]["data_percentage"], config["training"]["batch_size"])
+    training_data = get_dataset("training", ["flipud", "fliplr", "blur"], config["training"]["data_percentage"], config["training"]["batch_size"])
 
     model = train(model, training_data, test_data, config)
     

@@ -1,5 +1,6 @@
 from transformers import BeitModel
 from torch import nn
+import torch
 
 import matplotlib.pyplot as plt
 
@@ -9,48 +10,109 @@ import requests
 """
 Picked at https://github.com/920232796/SETR-pytorch/blob/master/SETR/transformer_seg.py
 """
+
+class BranchedDecoder(nn.Module):
+    
+    def __init__(self, in_channels, out_channels, features=[[256, 256], [256, 256], [512, 256, 128, 64]]):
+        super().__init__()
+        self.decoder_branch_1 = nn.Sequential(
+            nn.Conv2d(in_channels, features[0][0], 2, padding=0),
+            nn.BatchNorm2d(features[0][0]),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(features[0][0], features[0][1], 1, padding=0),
+            nn.BatchNorm2d(features[0][1]),
+            nn.LeakyReLU(inplace=True),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
+        )
+        
+        self.decoder_branch_2 = nn.Sequential(
+            nn.Conv2d(in_channels, features[1][0], 2, padding=0),
+            nn.BatchNorm2d(features[1][0]),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(features[0][0], features[0][1], 1, padding=0),
+            nn.BatchNorm2d(features[0][1]),
+            nn.LeakyReLU(inplace=True),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+        )
+        
+        self.merge_branch = nn.Sequential(
+            nn.Conv2d(features[2][0], features[2][1], 2, padding=0),
+            nn.BatchNorm2d(features[2][1]),
+            nn.LeakyReLU(inplace=True),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(features[2][1], features[2][2], 2, padding=0),
+            nn.BatchNorm2d(features[2][2]),
+            nn.LeakyReLU(inplace=True),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(features[2][2], features[2][3], 2, padding=0),
+            nn.BatchNorm2d(features[2][3]),
+            nn.LeakyReLU(inplace=True),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
+        )
+        
+        self.final_layer = nn.Conv2d(features[2][3], out_channels, 3, padding=0)
+        
+    
+    def forward(self, x):
+        x1 = self.decoder_branch_1(x)
+        
+        x2 = self.decoder_branch_2(x)
+        
+        x = torch.cat((x1, x2), 1)
+        
+        x = self.merge_branch(x)
+        
+        x = self.final_layer(x)
+        
+        return x
+
 class Decoder2D(nn.Module):
 
     # TODO: Maybe add dropout? Not sure if it is needed.
 
-    def __init__(self, in_channels, out_channels, features=[256, 256, 128, 64]):
+    def __init__(self, in_channels, out_channels, features=[512, 256, 128, 64]):
         super().__init__()
+        
+        self.conv1 = nn.Conv2d(in_channels, features[0], 2, padding=0)
+        torch.nn.init.kaiming_uniform_(self.conv1.weight, mode="fan_in", nonlinearity="relu")
+        
+        self.conv2 = nn.Conv2d(features[0], features[1], 2, padding=0)
+        torch.nn.init.kaiming_uniform_(self.conv2.weight, mode="fan_in", nonlinearity="relu")
+        
+        self.conv3 = nn.Conv2d(features[1], features[2], 2, padding=0)
+        torch.nn.init.kaiming_uniform_(self.conv3.weight, mode="fan_in", nonlinearity="relu")
+        
+        self.conv4 = nn.Conv2d(features[2], features[3], 2, padding=0)
+        torch.nn.init.kaiming_uniform_(self.conv4.weight, mode="fan_in", nonlinearity="relu")
+        
         self.decoder_1 = nn.Sequential(
-            nn.Conv2d(in_channels, features[0], 2, padding=0),
+            self.conv1,
             nn.BatchNorm2d(features[0]),
-            nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
-            nn.Conv2d(features[0], features[0], 2, padding=0),
-            nn.BatchNorm2d(features[0]),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         )
         self.decoder_2 = nn.Sequential(
-            nn.Conv2d(features[0], features[1], 2, padding=0),
+            self.conv2,
             nn.BatchNorm2d(features[1]),
-            nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
-            nn.Conv2d(features[1], features[1], 2, padding=0),
-            nn.BatchNorm2d(features[1]),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         )
         self.decoder_3 = nn.Sequential(
-            nn.Conv2d(features[1], features[2], 2, padding=0),
+            self.conv3,
             nn.BatchNorm2d(features[2]),
-            nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
-            nn.Conv2d(features[2], features[2], 2, padding=0),
-            nn.BatchNorm2d(features[2]),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         )
 
         self.decoder_4 = nn.Sequential(
-            nn.Conv2d(features[2], features[3], 2, padding=0),
+            self.conv4,
             nn.BatchNorm2d(features[3]),
-            nn.ReLU(inplace=True),
-            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True),
-            nn.Conv2d(features[3], features[3], 2, padding=0),
-            nn.BatchNorm2d(features[3]),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
+            nn.Dropout(),
+            nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         )
 
         self.final_out = (nn.Conv2d(features[-1], out_channels, 3, padding=0))
@@ -74,7 +136,7 @@ class BeitSegmentationModel(nn.Module):
         num_channels=3,
         num_classes=2,
         batch_size=16,
-        pretrained_model="microsoft/beit-base-patch16-224-pt22k-ft22k"
+        pretrained_model="microsoft/beit-base-patch16-224-pt22k"
     ):
 
         super(BeitSegmentationModel, self).__init__()
@@ -93,6 +155,9 @@ class BeitSegmentationModel(nn.Module):
         
         for param in self.beit_base.parameters():
             param.requires_grad = False
+        
+        for param in self.beit_base.pooler.parameters():
+            param.requires_grad = True
 
         self.decoder = Decoder2D(self.num_channels, self.num_classes)
 

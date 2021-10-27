@@ -200,9 +200,9 @@ class AerialImages(Dataset):
                                                                                      self.patch_size)
 
                 source_image_patches = source_image_patches / 255.0
-                source_features = [img.reshape(self.patch_size[0], self.patch_size[1], 3) for img in source_image_patches]
-                source_features = [(img - np.min(img)) / (np.max(img) - np.min(img)) for img in source_features]
-
+                target_image_patches = target_image_patches / 255.0
+                source_features = [np.nan_to_num(img.reshape(self.patch_size[0], self.patch_size[1], 3)) for img in source_image_patches]
+                
                 for aug in self.augmentation_techniques:
                     augmented_images, augmented_labels = self._augment_images(aug, source_features, target_image_patches)
                     all_features.extend(augmented_images)
