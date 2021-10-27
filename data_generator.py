@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
-from numpy.lib.function_base import angle
 import torch
 
 from torch.utils.data import Dataset
@@ -111,24 +110,21 @@ class AerialImages(Dataset):
         augmented_images = []
         augmented_labels = []
 
-        if aug == "rt":
-            for i in range(len(images)):
-                for angle in [30, 60, 120, 150, 210, 240, 300, 330]:
-                    augmented_images.append(rotate(images[i], angle=angle, mode="wrap"))
-                    augmented_labels.append(rotate(labels[i], angle=angle, mode="wrap"))
-        elif aug == "fliplr":
-            for i in range(len(images)):
-                augmented_images.append(np.fliplr(images[i]))
-                augmented_labels.append(np.fliplr(labels[i]))
-        elif aug == "flipud":
-            for i in range(len(images)):
-                augmented_images.append(np.flipud(images[i]))
-                augmented_labels.append(np.flipud(labels[i]))
-        elif aug == "blur":
-            for i in range(len(images)):
-                augmented_images.append(gaussian(images[i], sigma=1, multichannel=True))
-            
-            augmented_labels = labels
+        for i in range(len(images)):
+            if labels[i].mean() > 0.25:
+                if aug == "rt":
+                    for angle in [30, 60, 120, 150, 210, 240, 300, 330]:
+                        augmented_images.append(rotate(images[i], angle=angle, mode="wrap"))
+                        augmented_labels.append(rotate(labels[i], angle=angle, mode="wrap"))
+                elif aug == "fliplr":
+                    augmented_images.append(np.fliplr(images[i]))
+                    augmented_labels.append(np.fliplr(labels[i]))
+                elif aug == "flipud":
+                    augmented_images.append(np.flipud(images[i]))
+                    augmented_labels.append(np.flipud(labels[i]))
+                elif aug == "blur":
+                    augmented_images.append(gaussian(images[i], sigma=1, multichannel=True))
+                    augmented_labels.append(labels[i])
 
         return augmented_images, augmented_labels
 
@@ -348,20 +344,42 @@ import json
 
 if __name__ == "__main__":
 
-    data = get_dataset("test", ["flipud"])
+    data = get_dataset("test", augmentation_techniques=["blur", "flipud", "fliplr", "rt"], batch_size=1, data_percentage=1.0)
 
-    i, l = data[0]
-    image, label = data.get_images(0)
+    positive_pixel_count = 0
+    total_pixel_count = 0
+
+    weights = []
+
+    for img, tar in data:
+        positive = tar.sum().numpy()
+        count = tar.numel()
+
+        positive_pixel_count += positive
+        total_pixel_count += count
+
+        weights.append(positive / count)
+
 
     
-    i, l = i.reshape(16, 224, 224, 3), l.reshape(16, 224, 224, 1)
+    print("Positive pixel weight:", positive_pixel_count / total_pixel_count)
 
-    for idx in range(len(image)):
-        f, a = plt.subplots(1, 4)
-        print(i[idx])
-        print(type(i[idx]))
-        a[0].imshow(i[idx])
-        a[1].imshow(l[idx])
-        a[2].imshow(image[idx])
-        a[3].imshow(label[idx])
-        plt.show()
+    rounded_weights = sorted([round(w, 2) for w in weights])
+
+    rounded_weights_dict = sorted(set(rounded_weights))
+
+    weights, weights_count = [], []
+
+    for weight in rounded_weights_dict:
+        w_count = 0
+        for w in rounded_weights:
+            if weight == w:
+                w_count += 1
+        weights.append(weight)
+        weights_count.append(w_count)
+
+    print(weights)
+    print(weights_count)
+
+    plt.bar(weights, weights_count, width=0.1, align="edge", bottom=weights, linewidth=1)
+    plt.show()
