@@ -335,16 +335,25 @@ class AerialImages(Dataset):
         return feature_images, label_images
 
 
-class KartaiDataset(Dataset):
+class PretrainingAerialImages(AerialImages):
     def __init__(self):
         ...
-
 
 import json
 
 if __name__ == "__main__":
 
-    data = get_dataset("test", augmentation_techniques=["blur", "flipud", "fliplr", "rt"], batch_size=1, data_percentage=1.0)
+    data = get_dataset("test", augmentation_techniques=["blur"], batch_size=10, data_percentage=1.0)
+
+    images, labels = data[0]
+
+    print(images.shape)
+
+    for i in range(len(images)):
+        f, axarr = plt.subplots(1, 2)
+        axarr[0].imshow(images[i].reshape(224, 224, 3))
+        axarr[1].imshow(labels[i].reshape(224, 224, 1))
+        plt.show()
 
     positive_pixel_count = 0
     total_pixel_count = 0

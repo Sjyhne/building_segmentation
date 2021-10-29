@@ -136,3 +136,6 @@ github_token
 metrics*
 wandb
 training_data
+images
+pretraining_data
+beit/dall_e_weight
