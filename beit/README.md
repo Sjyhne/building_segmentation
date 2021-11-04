@@ -44,11 +44,7 @@ Then we need to get the pickles.
 
 In order to run the pre-training script, we need some arguments to make it work. These arguments are adjustable, and below I've provided an example of a default script.
 
-> run_beit_pretraining.py \
-        --data_path ${DATA_PATH} --output_dir ${OUTPUT_DIR} --num_mask_patches 75 \
-        --model beit_base_patch16_224_8k_vocab --discrete_vae_weight_path ${TOKENIZER_PATH} \
-        --batch_size 16 --lr 1.5e-3 --warmup_steps 10 --epochs 30 \
-        --clip_grad 3.0 --drop_path 0.1 --layer_scale_init_value 0.1 --device cpu
+> python beit/run_beit_pretraining.py --data_path ${DATA_PATH} --output_dir ${OUTPUT_DIR} --num_mask_patches 75 --model beit_base_patch16_224_8k_vocab --discrete_vae_weight_path ${TOKENIZER_PATH} --batch_size 16 --lr 1.5e-3 --warmup_steps 10 --epochs 30 --clip_grad 3.0 --drop_path 0.1 --layer_scale_init_value 0.1 --device cpu
 
 
 * __--num_mask_patches__:               Number of the input patches that needs to be masked
