@@ -59,7 +59,7 @@ __C.REDUCE_BORDER_EPOCH = -1
 # Comma Seperated List of class id to relax
 __C.STRICTBORDERCLASS = None
 # Where output results get written
-__C.RESULT_DIR = None
+__C.RESULT_DIR = "./multiscale/logs"
 
 __C.OPTIONS = AttrDict()
 __C.OPTIONS.TEST_MODE = False

@@ -132,3 +132,10 @@ data
 shadow_removal
 features
 data.zip
+beit/dalle_weights
+comparisons
+images
+pretraining_data
+pretraining_kartai
+training_data
+wandb

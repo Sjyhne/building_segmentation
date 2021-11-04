@@ -214,6 +214,8 @@ class ImageDumper():
         self.val_len = val_len
         self.tensorboard = tensorboard
         self.write_webpage = write_webpage
+        print(cfg.RESULT_DIR)
+        print(webpage_fn)
         self.webpage_fn = os.path.join(cfg.RESULT_DIR,
                                        'best_images', webpage_fn)
         self.dump_assets = dump_assets

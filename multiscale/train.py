@@ -36,6 +36,9 @@ import sys
 import time
 import torch
 
+from network.ocrnet import HRNet
+from loss.rmi import RMILoss
+
 from config import assert_and_infer_cfg, update_epoch, cfg
 from utils.misc import AverageMeter, prep_experiment, eval_metrics
 from utils.misc import ImageDumper
@@ -46,6 +49,10 @@ from loss.optimizer import get_optimizer, restore_opt, restore_net
 import datasets
 import network
 
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+
+from data_generator import get_dataset
 
 # Import autoresume module
 sys.path.append(os.environ.get('SUBMIT_SCRIPTS', '.'))
@@ -285,7 +292,7 @@ args.world_size = 1
 if args.test_mode:
     args.max_epoch = 2
 
-if 'WORLD_SIZE' in os.environ and args.apex:
+"""if 'WORLD_SIZE' in os.environ and args.apex:
     # args.apex = int(os.environ['WORLD_SIZE']) > 1
     args.world_size = int(os.environ['WORLD_SIZE'])
     args.global_rank = int(os.environ['RANK'])
@@ -295,56 +302,27 @@ if args.apex:
         args.global_rank, args.local_rank))
     torch.cuda.set_device(args.local_rank)
     torch.distributed.init_process_group(backend='nccl',
-                                         init_method='env://')
+                                         init_method='env://')"""
 
 
 def main():
     """
     Main Function
     """
-    if AutoResume:
-        AutoResume.init()
+    #Her må noe fikses, de bruke loaders for de spesifikke datasettene'
 
-    # Set up the Arguments, Tensorboard Writer, Dataloader, Loss Fn, Optimizer
-    assert_and_infer_cfg(args)
-    prep_experiment(args)
-    #Her må noe fikses, de bruke loaders for de spesifikke datasettene
-    train_loader, val_loader, train_obj = \
-        datasets.setup_loaders(args)
+    val_loader = get_dataset("test")
+    #train_loader = get_dataset("training")
+
     criterion, criterion_val = get_loss(args)
 
-    auto_resume_details = None
-    if AutoResume:
-        auto_resume_details = AutoResume.get_resume_details()
+    net = HRNet(2, RMILoss(
+            num_classes=2,
+            ignore_index=255)).double()
 
-    if auto_resume_details:
-        checkpoint_fn = auto_resume_details.get("RESUME_FILE", None)
-        checkpoint = torch.load(checkpoint_fn,
-                                map_location=torch.device('cpu'))
-        args.result_dir = auto_resume_details.get("TENSORBOARD_DIR", None)
-        args.start_epoch = int(auto_resume_details.get("EPOCH", None)) + 1
-        args.restore_net = True
-        args.restore_optimizer = True
-
-    elif args.resume:
-        checkpoint = torch.load(args.resume,
-                                map_location=torch.device('cpu'))
-        args.arch = checkpoint['arch']
-        args.start_epoch = int(checkpoint['epoch']) + 1
-        args.restore_net = True
-        args.restore_optimizer = True
-    elif args.snapshot:
-        if 'ASSETS_PATH' in args.snapshot:
-            args.snapshot = args.snapshot.replace('ASSETS_PATH', cfg.ASSETS_PATH)
-        checkpoint = torch.load(args.snapshot,
-                                map_location=torch.device('cpu'))
-        args.restore_net = True
-
-    net = network.get_net(args, criterion)
     optim, scheduler = get_optimizer(args, net)
 
-    net = network.wrap_network_in_dataparallel(net, args.apex)
-
+    """
     if args.summary:
         print(str(net))
         from thop import profile
@@ -353,47 +331,27 @@ def main():
         macs, params = profile(net, inputs={'images': img, 'gts': mask})
         print(f'macs {macs} params {params}')
         sys.exit()
-
-    if args.restore_optimizer:
-        restore_opt(optim, checkpoint)
-    if args.restore_net:
-        restore_net(net, checkpoint)
-
+    """
+    """
     if args.init_decoder:
         net.module.init_mods()
-
+    """
     torch.cuda.empty_cache()
-
-    if args.start_epoch != 0:
-        scheduler.step(args.start_epoch)
 
     # There are 4 options for evaluation:
     #  --eval val                           just run validation
     #  --eval val --dump_assets             dump all images and assets
     #  --eval folder                        just dump all basic images
     #  --eval folder --dump_assets          dump all images and assets
-    if args.eval == 'val':
-
-        if args.dump_topn:
-            validate_topn(val_loader, net, criterion_val, optim, 0, args)
-        else:
-            validate(val_loader, net, criterion=criterion_val, optim=optim, epoch=0,
-                     dump_assets=args.dump_assets,
-                     dump_all_images=args.dump_all_images,
-                     calc_metrics=not args.no_metrics)
-        return 0
-    elif args.eval == 'folder':
-        # Using a folder for evaluation means to not calculate metrics
-        validate(val_loader, net, criterion=None, optim=None, epoch=0,
-                 calc_metrics=False, dump_assets=args.dump_assets,
-                 dump_all_images=True)
-        return 0
-    elif args.eval is not None:
-        raise 'unknown eval option {}'.format(args.eval)
-
+    #validate(val_loader, net, criterion=criterion_val, optim=optim, epoch=0,
+    #            dump_assets=args.dump_assets,
+    #            dump_all_images=args.dump_all_images,
+    #            calc_metrics=not args.no_metrics)
+   
     for epoch in range(args.start_epoch, args.max_epoch):
+        
         update_epoch(epoch)
-
+        """
         if args.only_coarse:
             train_obj.only_coarse()
             train_obj.build_epoch()
@@ -410,14 +368,12 @@ def main():
                 train_obj.build_epoch()
         else:
             pass
+        """
 
-        train(train_loader, net, optim, epoch)
+        train(val_loader, net, optim, epoch)
 
-        if args.apex:
-            train_loader.sampler.set_epoch(epoch + 1)
-
-        if epoch % args.val_freq == 0:
-            validate(val_loader, net, criterion_val, optim, epoch)
+        #if epoch % args.val_freq == 0:
+        #    validate(val_loader, net, criterion_val, optim, epoch)
 
         scheduler.step()
 
@@ -439,27 +395,22 @@ def train(train_loader, net, optim, curr_epoch):
     start_time = None
     warmup_iter = 10
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     for i, data in enumerate(train_loader):
-        if i <= warmup_iter:
-            start_time = time.time()
-        # inputs = (bs,3,713,713)
-        # gts    = (bs,713,713)
-        images, gts, _img_name, scale_float = data
+        #if i <= warmup_iter:
+        #    start_time = time.time()
+        # inputs = (batch_size, num_channels(3), height(713), width(713))
+        # gts    = (batch_size, heigth(713), width(713))
+        images, gts = data
         batch_pixel_size = images.size(0) * images.size(2) * images.size(3)
-        images, gts, scale_float = images.cuda(), gts.cuda(), scale_float.cuda()
+        images, gts = images.to(device), gts.to(device)
         inputs = {'images': images, 'gts': gts}
 
         optim.zero_grad()
         main_loss = net(inputs)
-
-        if args.apex:
-            log_main_loss = main_loss.clone().detach_()
-            torch.distributed.all_reduce(log_main_loss,
-                                         torch.distributed.ReduceOp.SUM)
-            log_main_loss = log_main_loss / args.world_size
-        else:
-            main_loss = main_loss.mean()
-            log_main_loss = main_loss.clone().detach_()
+        main_loss = main_loss.mean()
+        log_main_loss = main_loss.clone().detach_()
 
         train_main_loss.update(log_main_loss.item(), batch_pixel_size)
 

@@ -45,7 +45,7 @@ def get_dataset(data_type, data_percentage=1.0):
 
 
 class AerialImages(Dataset):
-    def __init__(self, data_dir, data_type, data_percentage=1.0, transform=None, patch_size=(224, 224), batch_size=16, feature_extractor_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
+    def __init__(self, data_dir, data_type, data_percentage=1.0, transform=None, patch_size=(713, 713), batch_size=2, feature_extractor_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
         self.transform = transform
 
         self.patch_size = patch_size
@@ -153,9 +153,9 @@ class AerialImages(Dataset):
                                                                                      large_target_image,
                                                                                      self.patch_size)
 
-                source_features = fe(images=source_image_patches, return_tensors="pt")["pixel_values"]
+                #source_features = fe(images=source_image_patches, return_tensors="pt")["pixel_values"]
 
-                all_features.extend(source_features)
+                all_features.extend(source_image_patches)
                 all_labels.extend(target_image_patches)
 
                 all_features_images.extend(source_image_patches)
@@ -167,7 +167,7 @@ class AerialImages(Dataset):
             for _, index in tqdm(enumerate(range(len(all_features))), total=len(all_features), desc="Storing features and labels"):
                 np.save(os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), np.asarray(all_features_images[index]) / 255.0)
                 np.save(os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".npy"), all_labels_images[index].reshape(self.patch_size[0], self.patch_size[1], 1))
-                torch.save(all_features[index].double(), os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
+                torch.save(torch.from_numpy(all_features[index]).double(), os.path.join(feature_dir, "feature_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
                 torch.save(torch.from_numpy(all_labels[index]).double(), os.path.join(label_dir, "label_" + str(index).zfill(len(str(len(all_features)))) + ".pt"))
             
             print("Finished creating features and storing labels and features")
@@ -247,8 +247,6 @@ class AerialImages(Dataset):
         source_patches = source_patches.reshape((source_patches.shape[0] * source_patches.shape[1]), source_patches.shape[2], source_patches.shape[3], source_patches.shape[4])
         target_patches = target_patches.reshape((target_patches.shape[0] * target_patches.shape[1]), target_patches.shape[4], target_patches.shape[2], target_patches.shape[3])
 
-        source_patches = [Image.fromarray(np.uint8(arr)) for arr in source_patches]
-
         return source_patches, target_patches
 
 
@@ -262,6 +260,7 @@ class AerialImages(Dataset):
 
         for i, f in enumerate(self.batch_feature_paths[idx]):
             feature = torch.load(f)
+            feature = feature.reshape(features.shape[1:])
             features[i] = feature
 
         for i, l in enumerate(self.batch_label_paths[idx]):
