@@ -307,7 +307,7 @@ def assert_and_infer_cfg(args, make_immutable=True, train_mode=True):
         __C.LOSS.OCR_ALPHA = args.ocr_alpha
 
     if args.ocr_aux_loss_rmi:
-        __C.LOSS.OCR_AUX_RMI = True
+        __C.LOSS.OCR_AUX_RMI = False
 
     if args.supervised_mscale_loss_wt is not None:
         __C.LOSS.SUPERVISED_MSCALE_WT = args.supervised_mscale_loss_wt

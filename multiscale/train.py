@@ -310,15 +310,19 @@ def main():
     Main Function
     """
     #Her må noe fikses, de bruke loaders for de spesifikke datasettene'
+    
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     val_loader = get_dataset("test")
     #train_loader = get_dataset("training")
 
     criterion, criterion_val = get_loss(args)
+    
+    criterion = torch.nn.MSELoss()
+    
+    print(criterion)
 
-    net = HRNet(2, RMILoss(
-            num_classes=2,
-            ignore_index=255)).double()
+    net = HRNet(1, criterion=criterion).to(device).double()
 
     optim, scheduler = get_optimizer(args, net)
 
@@ -370,7 +374,7 @@ def main():
             pass
         """
 
-        train(val_loader, net, optim, epoch)
+        train(val_loader, net, optim, epoch, device)
 
         #if epoch % args.val_freq == 0:
         #    validate(val_loader, net, criterion_val, optim, epoch)
@@ -380,7 +384,7 @@ def main():
 
 
 
-def train(train_loader, net, optim, curr_epoch):
+def train(train_loader, net, optim, curr_epoch, device):
     """
     Runs the training loop per epoch
     train_loader: Data loader for train
@@ -395,14 +399,13 @@ def train(train_loader, net, optim, curr_epoch):
     start_time = None
     warmup_iter = 10
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     for i, data in enumerate(train_loader):
         #if i <= warmup_iter:
         #    start_time = time.time()
         # inputs = (batch_size, num_channels(3), height(713), width(713))
         # gts    = (batch_size, heigth(713), width(713))
         images, gts = data
+        print(gts.shape)
         batch_pixel_size = images.size(0) * images.size(2) * images.size(3)
         images, gts = images.to(device), gts.to(device)
         inputs = {'images': images, 'gts': gts}
@@ -415,6 +418,8 @@ def train(train_loader, net, optim, curr_epoch):
         train_main_loss.update(log_main_loss.item(), batch_pixel_size)
 
         main_loss.backward()
+        
+        print(main_loss)
 
         optim.step()
 

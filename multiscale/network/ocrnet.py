@@ -83,8 +83,9 @@ class OCRNet(nn.Module):
 
         if self.training:
             gts = inputs['gts']
-            aux_loss = self.criterion(aux_out, gts,
-                                      do_rmi=cfg.LOSS.OCR_AUX_RMI)
+            #aux_loss = self.criterion(aux_out, gts,
+            #                          do_rmi=cfg.LOSS.OCR_AUX_RMI)
+            aux_loss = self.criterion(aux_out, gts)
             main_loss = self.criterion(cls_out, gts)
             loss = cfg.LOSS.OCR_ALPHA * aux_loss + main_loss
             return loss
