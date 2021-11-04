@@ -138,4 +138,5 @@ wandb
 training_data
 images
 pretraining_data
-beit/dall_e_weight
+beit/dalle_weight
+pretraining_data
