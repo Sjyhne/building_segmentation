@@ -308,6 +308,7 @@ def main():
     # Set up the Arguments, Tensorboard Writer, Dataloader, Loss Fn, Optimizer
     assert_and_infer_cfg(args)
     prep_experiment(args)
+    #Her må noe fikses, de bruke loaders for de spesifikke datasettene
     train_loader, val_loader, train_obj = \
         datasets.setup_loaders(args)
     criterion, criterion_val = get_loss(args)

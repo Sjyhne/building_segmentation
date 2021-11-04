@@ -16,8 +16,8 @@ def get_net(args, criterion):
     net = get_model(network='network.' + args.arch,
                     num_classes=cfg.DATASET.NUM_CLASSES,
                     criterion=criterion)
-    num_params = sum([param.nelement() for param in net.parameters()])
-    logx.msg('Model params = {:2.1f}M'.format(num_params / 1000000))
+    #num_params = sum([param.nelement() for param in net.parameters()])
+    #logx.msg('Model params = {:2.1f}M'.format(num_params / 1000000))
 
     net = net.cuda()
     return net
