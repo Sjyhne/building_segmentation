@@ -131,6 +131,7 @@ data
 shadow_removal
 features
 data.zip
+<<<<<<< HEAD
 comparisons
 github_token
 metrics*
@@ -140,3 +141,12 @@ images
 pretraining_data
 beit/dalle_weight
 pretraining_data
+=======
+beit/dalle_weights
+comparisons
+images
+pretraining_data
+pretraining_kartai
+training_data
+wandb
+>>>>>>> 6f8395d31cc1e088994bd22ec3a00d2274e20b1f

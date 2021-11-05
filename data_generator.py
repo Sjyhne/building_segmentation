@@ -23,6 +23,8 @@ import torchvision
 
 main_dir = "./data/tiff"
 
+#python multiscale/train.py --rmi_loss=true
+
 training_data_dir = [main_dir + "/train", main_dir + "/train_labels"]
 test_data_dir = [main_dir + "/test", main_dir + "/test_labels"]
 validation_data_dir = [main_dir + "/val", main_dir + "/val_labels"]
@@ -66,7 +68,7 @@ def get_kartai_image_paths(dataset_name: str, data_type: str):
     return source_image_paths, target_image_paths
 
 
-def get_dataset(data_type, augmentation_techniques=[], data_percentage=1.0, batch_size=16):
+def get_dataset(data_type, augmentation_techniques=[], data_percentage=1.0, batch_size=1):
     if data_type == "training":
         return AerialImages(training_data_dir, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
     elif data_type == "test":
@@ -90,7 +92,7 @@ def get_kartai_dataset(dataset, data_type, augmentation_techniques=[], data_perc
 
 
 class AerialImages(Dataset):
-    def __init__(self, data_dir, data_type, data_percentage=1.0, augmentation_techniques=[], patch_size=(224, 224), batch_size=16, kartai=True):
+    def __init__(self, data_dir, data_type, data_percentage=1.0, augmentation_techniques=[], patch_size=(713, 713), batch_size=1, kartai=False):
 
         self.augmentation_techniques = augmentation_techniques
 
@@ -200,9 +202,9 @@ class AerialImages(Dataset):
         # if not "./features/model.../train"
         if not os.path.exists(os.path.join(target_dir)):
             print("Did not find:", target_dir, "... Creating necessary dirs")
-            os.mkdir(target_dir)
-            os.mkdir(feature_dir)
-            os.mkdir(label_dir)
+            os.makedirs(target_dir)
+            os.makedirs(feature_dir)
+            os.makedirs(label_dir)
 
             #self.channel_means = self.get_channel_means()
             #self.channel_stds = self.get_channel_stds()
@@ -223,7 +225,6 @@ class AerialImages(Dataset):
             #    image_mean=self.channel_means,
             #    image_std=self.channel_stds
             #)
-
             for _, i in tqdm(enumerate(range(len(source_image_paths))),
                              total=len(source_image_paths),
                              desc="Creating features and labels"
@@ -402,41 +403,27 @@ if __name__ == "__main__":
 
 
     """data = get_dataset("test", augmentation_techniques=["blur"], batch_size=10, data_percentage=1.0)
-
     images, labels = data[0]
-
     print(images.shape)
-
     for i in range(len(images)):
         f, axarr = plt.subplots(1, 2)
         axarr[0].imshow(images[i].reshape(224, 224, 3))
         axarr[1].imshow(labels[i].reshape(224, 224, 1))
         plt.show()
-
     positive_pixel_count = 0
     total_pixel_count = 0
-
     weights = []
-
     for img, tar in data:
         positive = tar.sum().numpy()
         count = tar.numel()
-
         positive_pixel_count += positive
         total_pixel_count += count
-
         weights.append(positive / count)
-
-
     
     print("Positive pixel weight:", positive_pixel_count / total_pixel_count)
-
     rounded_weights = sorted([round(w, 2) for w in weights])
-
     rounded_weights_dict = sorted(set(rounded_weights))
-
     weights, weights_count = [], []
-
     for weight in rounded_weights_dict:
         w_count = 0
         for w in rounded_weights:
@@ -444,10 +431,8 @@ if __name__ == "__main__":
                 w_count += 1
         weights.append(weight)
         weights_count.append(w_count)
-
     print(weights)
     print(weights_count)
-
     plt.bar(weights, weights_count, width=0.1, align="edge", bottom=weights, linewidth=1)
     plt.show()
     """
