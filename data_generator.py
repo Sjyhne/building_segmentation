@@ -11,6 +11,8 @@ from skimage.transform import rotate, AffineTransform, warp
 from skimage.util import random_noise
 from skimage.filters import gaussian
 
+import json
+
 import os
 import random
 import shutil
@@ -39,6 +41,30 @@ def get_image_paths(data_dir):
     
     return source_image_paths, target_image_paths
 
+def get_kartai_image_paths(dataset_name: str, data_type: str):
+    main_dir = os.path.join("training_data", "created_datasets")
+
+    dataset_dir = os.path.join(main_dir, dataset_name)
+
+    if data_type == "training":
+        paths = json.load(open(os.path.join(dataset_dir, "train_set.json")))
+    elif data_type == "test":
+        paths = json.load(open(os.path.join(dataset_dir, "test_set.json")))
+    elif data_type == "validation":
+        paths = json.load(open(os.path.join(dataset_dir, "valid_set.json")))
+    else:
+        raise RuntimeError(f"Datatype does not exist: {data_type}. Please choose between 'training', 'test', and 'validation'")
+    
+    source_image_paths, target_image_paths = [], []
+
+    for item in paths:
+        source_image_paths.append(item["image"])
+        target_image_paths.append(item["label"])
+    
+    assert len(source_image_paths) == len(target_image_paths)
+
+    return source_image_paths, target_image_paths
+
 
 def get_dataset(data_type, augmentation_techniques=[], data_percentage=1.0, batch_size=16):
     if data_type == "training":
@@ -50,21 +76,36 @@ def get_dataset(data_type, augmentation_techniques=[], data_percentage=1.0, batc
     else:
         raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
 
+def get_kartai_dataset(dataset, data_type, augmentation_techniques=[], data_percentage=1.0, batch_size=16):
+    if data_type == "training":
+        return AerialImages(dataset, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
+    elif data_type == "test":
+        return AerialImages(dataset, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
+    elif data_type == "validation":
+        return AerialImages(dataset, data_type, data_percentage, augmentation_techniques=augmentation_techniques, batch_size=batch_size)
+    else:
+        raise RuntimeError("The specified dataset type does not exist. Please choose from the following dataset types: [training, test, validation]")
+
+
+
 
 class AerialImages(Dataset):
-    def __init__(self, data_dir, data_type, data_percentage=1.0, augmentation_techniques=[], patch_size=(224, 224), batch_size=16, feature_extractor_model="microsoft/beit-base-patch16-224-pt22k-ft22k"):
+    def __init__(self, data_dir, data_type, data_percentage=1.0, augmentation_techniques=[], patch_size=(224, 224), batch_size=16, kartai=True):
 
         self.augmentation_techniques = augmentation_techniques
 
         self.patch_size = patch_size
         self.batch_size = batch_size
-
-        self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
+        self.kartai = kartai
+        
+        if self.kartai:
+            self.source_image_paths, self.target_image_paths = get_kartai_image_paths(data_dir, data_type)
+        else:
+            self.source_image_paths, self.target_image_paths = get_image_paths(data_dir)
 
         self.feature_paths, self.label_paths = self._get_features(self.source_image_paths,
                                                                   self.target_image_paths,
                                                                   data_type,
-                                                                  feature_extractor_model,
                                                                   data_percentage)
 
         # Todo: Create bacthes
@@ -133,7 +174,6 @@ class AerialImages(Dataset):
                       source_image_paths,
                       target_image_paths,
                       data_type,
-                      feature_extractor_model,
                       data_percentage
                       ):
 
@@ -144,9 +184,9 @@ class AerialImages(Dataset):
         all_labels_images = []
 
         if len(self.augmentation_techniques) != 0:
-            target_dir = Path(os.path.join("features", feature_extractor_model, data_type + "_" + "_".join(sorted(self.augmentation_techniques))))
+            target_dir = Path(os.path.join("features", data_type + "_" + "_".join(sorted(self.augmentation_techniques))))
         else:
-            target_dir = Path(os.path.join("features", feature_extractor_model, data_type))
+            target_dir = Path(os.path.join("features", data_type))
 
 
         feature_dir = Path(os.path.join(target_dir), "features")
@@ -335,15 +375,33 @@ class AerialImages(Dataset):
         return feature_images, label_images
 
 
-class PretrainingAerialImages(AerialImages):
-    def __init__(self):
-        ...
+def plot_datapoint(img, lab):
+    f, ax = plt.subplots(1, 2, figsize=(16, 16))
+    ax[0].imshow(img)
+    ax[1].imshow(lab)
+    plt.show()
 
-import json
+def plot_batch(images, labels, count):
+    for idx in range(len(images)):
+        plot_datapoint(images[idx], labels[idx])
+        if idx + 1 == count:
+            break
 
 if __name__ == "__main__":
 
-    data = get_dataset("test", augmentation_techniques=["blur"], batch_size=10, data_percentage=1.0)
+    data = get_kartai_dataset("hoyde_ortofoto_medium_area", "training")
+
+    images, labels = data[0]
+
+    print(len(images), len(labels))
+
+    i, l = data.get_images(0)
+
+    plot_batch(i, l, 2)
+
+
+
+    """data = get_dataset("test", augmentation_techniques=["blur"], batch_size=10, data_percentage=1.0)
 
     images, labels = data[0]
 
@@ -392,3 +450,4 @@ if __name__ == "__main__":
 
     plt.bar(weights, weights_count, width=0.1, align="edge", bottom=weights, linewidth=1)
     plt.show()
+    """
