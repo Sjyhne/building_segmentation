@@ -185,7 +185,7 @@ if __name__ == "__main__":
 
     test_data = get_dataset("test", data_percentage=config["test"]["data_percentage"], batch_size=config["test"]["batch_size"])
 
-    training_data = get_dataset("training", ["flipud", "fliplr", "blur"], config["training"]["data_percentage"], config["training"]["batch_size"])
+    training_data = get_dataset("training", [], config["training"]["data_percentage"], config["training"]["batch_size"])
 
     model = train(model, training_data, test_data, config)
     

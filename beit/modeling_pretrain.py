@@ -94,7 +94,6 @@ class VisionTransformerForMaskedImageModeling(nn.Module):
         return len(self.blocks)
 
     def forward_features(self, x, bool_masked_pos):
-        print(x.shape)
         x = self.patch_embed(x, bool_masked_pos=bool_masked_pos)
         batch_size, seq_len, _ = x.size()
 

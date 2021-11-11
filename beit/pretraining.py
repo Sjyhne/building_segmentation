@@ -2,6 +2,8 @@ import math
 import sys
 from typing import Iterable
 
+import wandb
+
 import torch
 import torch.nn as nn
 
@@ -45,7 +47,7 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
             loss = nn.CrossEntropyLoss()(input=outputs, target=labels)
 
         loss_value = loss.item()
-
+        
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             sys.exit(1)
@@ -95,6 +97,6 @@ def train_one_epoch(model: torch.nn.Module, d_vae: torch.nn.Module,
         if lr_scheduler is not None:
             lr_scheduler.step_update(start_steps + step)
     # gather the stats from all processes
-    metric_logger.synchronize_between_processes()
+    #metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}

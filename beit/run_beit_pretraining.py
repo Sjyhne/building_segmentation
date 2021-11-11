@@ -7,6 +7,8 @@ import torch.backends.cudnn as cudnn
 import json
 import os
 
+import wandb
+
 from pathlib import Path
 
 from timm.models import create_model
@@ -141,6 +143,8 @@ def get_model(args):
 def main(args):
 
     print(args)
+    
+    wandb.init(project="beit-pretraining", entity="sjyhne", config=args)
 
     device = torch.device(args.device)
 
@@ -180,6 +184,7 @@ def main(args):
     )
 
     model.to(device)
+        
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -213,6 +218,8 @@ def main(args):
 
     utils.auto_load_model(
         args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+    
+    wandb.watch(model, criterion=loss_scaler)
 
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
@@ -229,6 +236,7 @@ def main(args):
             lr_schedule_values=lr_schedule_values,
             wd_schedule_values=wd_schedule_values,
         )
+        wandb.log(train_stats)
         if args.output_dir:
             if (epoch + 1) % args.save_ckpt_freq == 0 or epoch + 1 == args.epochs:
                 utils.save_model(

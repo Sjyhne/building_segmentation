@@ -141,3 +141,4 @@ pretraining_data
 beit/dalle_weights
 pretraining_kartai
 datasets
+models
