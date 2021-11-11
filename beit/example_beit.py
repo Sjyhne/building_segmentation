@@ -9,13 +9,16 @@ import numpy as np
 
 import requests
 
-import torchvision
+import torchvision.transforms as transforms
 
 import torch
 
 from data_generator import get_dataset
 
 import cv2
+
+from timm.models import create_model
+from timm.models import list_models
 
 """
 https://www.kaggle.com/piantic/vision-transformer-vit-visualize-attention-map
@@ -24,17 +27,51 @@ https://www.kaggle.com/piantic/vision-transformer-vit-visualize-attention-map
 
 
 
-pretrained = BeitModel.from_pretrained("microsoft/beit-base-patch16-224-pt22k", output_attentions=True)
+#pretrained = BeitModel.from_pretrained("microsoft/beit-base-patch16-224-pt22k", output_attentions=True)
 #base = BeitModel.from_pretrained("microsoft/beit-base-patch16-224", output_attentions=True)
 #finetuned = BeitModel.from_pretrained("microsoft/beit-base-patch16-224-pt22k-ft22k", output_attentions=True)
 
 #models = [pretrained, base, finetuned]
 
-data = get_dataset("training", data_percentage=0.01, batch_size=8)
+print(list_models())
+
+model = create_model(
+    model_name="beit_base_patch16_224_8k_vocab",
+    pretrained=False,
+    drop_path_rate=0.1,
+    drop_block_rate=None,
+    )
+
+checkpoint = torch.load("model_checkpoints/checkpoint-1299.pth", map_location=torch.device("cpu"))
+
+print(checkpoint)
+
+model.load_state_dict(checkpoint['model'])
+
+data = get_dataset("test", data_percentage=0.01, batch_size=8)
 
 image, label = data[0]
 img, _ = data.get_images(0)
 
+plt.imshow(image[0].permute(1, 2, 0))
+plt.show()
+
+trans = transforms.Compose([transforms.Normalize(mean=[0.5], std=[0.5])])
+
+t_img = trans(image[0])
+
+b_img = feature_extractor(images=image[0], return_tensors="pt")
+
+print(b_img)
+
+plt.imshow(t_img.permute(1, 2, 0))
+plt.show()
+
+
+print(b_img["pixel_values"].shape)
+
+plt.imshow(b_img["pixel_values"].permute(0, 2, 3, 1).squeeze(0))
+plt.show()
 
 def get_attention_info(img, model):
 
@@ -128,7 +165,7 @@ def plot_attention_map(original_img, model_id, att_map, mask):
 #att_mat = get_attention_map(image, img[0])
 
 #plot_attention_map(img[0], att_mat)
-
+"""
 joint_att1, grid_size1 = get_attention_info(image[0], pretrained)
 
 for i, v in enumerate(joint_att1):
@@ -143,7 +180,7 @@ for i, v in enumerate(joint_att1):
     ax2.set_title('Attention Map_%d Layer' % (i+1))
     _ = ax1.imshow(image[0])
     _ = ax2.imshow(result)
-
+"""
 """for i, model in enumerate(models):
     att_mat_no_mask = get_attention_map(image[0], img[0], model, get_mask=False)
     att_mat_mask = get_attention_map(image[0], img[0], model, get_mask=True)

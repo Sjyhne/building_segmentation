@@ -60,3 +60,9 @@ In order to run the pre-training script, we need some arguments to make it work.
 * __--drop_path__:                      Stochastic depth rate
 * __--imagenet_default_mean_and_std__:  Enable this for ImageNet-1k pre-training, i.e., (0.485, 0.456, 0.406) for mean and (0.229, 0.224, 0.225) for std. We use (0.5, 0.5, 0.5) for mean and (0.5, 0.5, 0.5) for std by default on other pre-training data.
 * __--layer_scale_init_value__:         0.1 for base, 1e-5 for large, set 0 to disable layerscale
+
+
+
+> python beit/run_class_finetuning.py --model beit_base_patch16_224 --data_path $DATA_PATH --nb_classes 1 --data_set image_folder --disable_eval_during_finetuning --finetune https://unilm.blob.core.windows.net/beit/beit_base_patch16_224_pt22k.pth --output_dir $OUTPUT_DIR --batch_size 4 --lr 2e-3 --update_freq 2 --warmup_epochs 5 --epochs 90 --layer_decay 0.75 --drop_path 0.2 --weight_decay 0.05 --layer_scale_init_value 1e-5 --clip_grad 1.0 --device cpu
+
+> bash tools/dist_train.sh configs/beit/upernet/upernet_beit_base_12_512_slide_160k_custom_pt.py 8 --work-dir model_checkpoints --seed 0  --deterministic --options model.pretrained=https://unilm.blob.core.windows.net/beit/beit_base_patch16_224_pt22k_ft22k.pth

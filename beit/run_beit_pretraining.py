@@ -106,7 +106,7 @@ def get_args():
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--num_workers', default=10, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--pin_mem', action='store_true',
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem',
@@ -166,24 +166,9 @@ def main(args):
         weight_path=args.discrete_vae_weight_path, d_vae_type=args.discrete_vae_type,
         device=device, image_size=args.second_input_size)
 
-    #if True:  # args.distributed:
-    #    num_tasks = utils.get_world_size()
-    #    global_rank = utils.get_rank()
-    #    sampler_rank = global_rank
-    #    num_training_steps_per_epoch = len(dataset_train) // args.batch_size // num_tasks
-#
-    #    sampler_train = torch.utils.data.DistributedSampler(
-    #        dataset_train, num_replicas=num_tasks, rank=sampler_rank, shuffle=True
-    #    )
-    #    print("Sampler_train = %s" % str(sampler_train))
-    #else:
     num_training_steps_per_epoch = len(dataset_train) // args.batch_size
     sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
-    #if global_rank == 0 and args.log_dir is not None:
-    #    os.makedirs(args.log_dir, exist_ok=True)
-    #    log_writer = utils.TensorboardLogger(log_dir=args.log_dir)
-    #else:
     log_writer = None
 
     data_loader_train = torch.utils.data.DataLoader(
