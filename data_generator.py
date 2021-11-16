@@ -346,13 +346,14 @@ def get_image_patches(source_image, target_image, patch_size):
     for y in range(y_patches):
         for x in range(x_patches):
             source_patch = np.full((patch_size[0], patch_size[1], 3), (255, 102, 255), dtype=np.uint8)
-            target_patch = np.zeros((patch_size[0], patch_size[1], 1), dtype=np.uint8)
+            target_patch = np.full((patch_size[0], patch_size[1], 1), 0, dtype=np.uint8)
             #                               0 * 224 = 0 : (0 + 1) * 224 = 224
             temp_source_patch = source_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
             temp_target_patch = target_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
 
             temp_target_patch = np.amax(temp_target_patch, axis=2).reshape(temp_target_patch.shape[0], temp_target_patch.shape[1], 1)
-
+            temp_target_patch[temp_target_patch > 0] = 1
+            
             if temp_source_patch.shape[0] != patch_size[0] or temp_source_patch.shape[1] != patch_size[1]:
                 source_patch[:temp_source_patch.shape[0], :temp_source_patch.shape[1]] = temp_source_patch
                 target_patch[:temp_target_patch.shape[0], :temp_target_patch.shape[1]] = temp_target_patch
@@ -431,9 +432,9 @@ def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, 
 
 if __name__ == "__main__":
 
-    create_image_tiles_for_custom_dataset("aerial_512", "train", "data/tiff/train", "data/tiff/train_labels", (512, 512))
-    create_image_tiles_for_custom_dataset("aerial_512", "test", "data/tiff/test", "data/tiff/test_labels", (512, 512))
-    create_image_tiles_for_custom_dataset("aerial_512", "val", "data/tiff/val", "data/tiff/val_labels", (512, 512))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224/", "train", "/home/sandej17/building_segmentation/datasets/kartai_ksand_manuell_512/img_dir/train", "/home/sandej17/building_segmentation/datasets/kartai_ksand_manuell_512/ann_dir/train", (224, 224))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224/", "test", "/home/sandej17/building_segmentation/datasets/kartai_ksand_manuell_512/img_dir/test", "/home/sandej17/building_segmentation/datasets/kartai_ksand_manuell_512/ann_dir/test", (224, 224))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224/", "val", "/home/sandej17/building_segmentation/datasets/kartai_ksand_manuell_512/img_dir/val", "/home/sandej17/building_segmentation/datasets/kartai_ksand_manuell_512/ann_dir/val", (224, 224))
 
     exit()
 
