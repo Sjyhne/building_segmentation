@@ -420,11 +420,15 @@ def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, 
     print("All images and labels has matching names")
 
     for img, label in zip(img_files, label_files):
-        img_tiles, label_tiles = get_image_patches(cv.imread(img), cv.imread(label), tilesize)
-        for i, (img_tile, label_tile) in enumerate(zip(img_tiles, label_tiles)):
-            cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "_" + str(i) + "." + img.split("/")[-1].split(".")[1]), img_tile)
-            cv.imwrite(os.path.join(datatype_ann_dir, label.split("/")[-1].split(".")[0] + "_" + str(i) + "." + label.split("/")[-1].split(".")[1]), label_tile)
-    
+        if cv.imread(img).shape[0] != tilesize[0] and cv.imread(img).shape[1] != tilesize[1]:
+            img_tiles, label_tiles = get_image_patches(cv.imread(img), cv.imread(label), tilesize)
+            for i, (img_tile, label_tile) in enumerate(zip(img_tiles, label_tiles)):
+                cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "_" + str(i) + "." + img.split("/")[-1].split(".")[1]), img_tile)
+                cv.imwrite(os.path.join(datatype_ann_dir, label.split("/")[-1].split(".")[0] + "_" + str(i) + "." + label.split("/")[-1].split(".")[1]), label_tile)
+        else:
+            cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "." + img.split("/")[-1].split(".")[1]), cv.imread(img))
+            cv.imwrite(os.path.join(datatype_ann_dir, label.split("/")[-1].split(".")[0] + "." + label.split("/")[-1].split(".")[1]), cv.imread(label))
+
     print("Finished writing images to:", dataset_dir)
 
     
@@ -432,9 +436,9 @@ def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, 
 
 if __name__ == "__main__":
 
-    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224", "train", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", (224, 224))
-    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224", "test", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", (224, 224))
-    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224", "val", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", (224, 224))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512", "train", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512", "test", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512", "val", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512))
 
     exit()
 
