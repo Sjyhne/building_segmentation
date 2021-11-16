@@ -431,9 +431,9 @@ def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, 
 
 if __name__ == "__main__":
 
-    create_image_tiles_for_custom_dataset("aerial_512", "train", "data/tiff/train", "data/tiff/train_labels", (512, 512))
-    create_image_tiles_for_custom_dataset("aerial_512", "test", "data/tiff/test", "data/tiff/test_labels", (512, 512))
-    create_image_tiles_for_custom_dataset("aerial_512", "val", "data/tiff/val", "data/tiff/val_labels", (512, 512))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224", "train", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", (224, 224))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224", "test", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", (224, 224))
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_224", "val", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", (224, 224))
 
     exit()
 
