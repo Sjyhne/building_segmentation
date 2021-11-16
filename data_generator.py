@@ -346,13 +346,14 @@ def get_image_patches(source_image, target_image, patch_size):
     for y in range(y_patches):
         for x in range(x_patches):
             source_patch = np.full((patch_size[0], patch_size[1], 3), (255, 102, 255), dtype=np.uint8)
-            target_patch = np.zeros((patch_size[0], patch_size[1], 1), dtype=np.uint8)
+            target_patch = np.full((patch_size[0], patch_size[1], 1), 0, dtype=np.uint8)
             #                               0 * 224 = 0 : (0 + 1) * 224 = 224
             temp_source_patch = source_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
             temp_target_patch = target_image[y * patch_size[0]:(y + 1) * patch_size[0], x * patch_size[1]:(x + 1) * patch_size[1]]
 
             temp_target_patch = np.amax(temp_target_patch, axis=2).reshape(temp_target_patch.shape[0], temp_target_patch.shape[1], 1)
-
+            temp_target_patch[temp_target_patch > 0] = 1
+            
             if temp_source_patch.shape[0] != patch_size[0] or temp_source_patch.shape[1] != patch_size[1]:
                 source_patch[:temp_source_patch.shape[0], :temp_source_patch.shape[1]] = temp_source_patch
                 target_patch[:temp_target_patch.shape[0], :temp_target_patch.shape[1]] = temp_target_patch
