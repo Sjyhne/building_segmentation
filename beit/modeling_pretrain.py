@@ -14,7 +14,8 @@ def trunc_normal_(tensor, mean=0., std=1.):
 
 __all__ = [
     'beit_base_patch16_224_8k_vocab', 
-    'beit_large_patch16_224_8k_vocab', 
+    'beit_large_patch16_224_8k_vocab',
+    'beit_large_patch16_512_8k_vocab',
 ]
 
 
@@ -145,6 +146,20 @@ def beit_large_patch16_224_8k_vocab(pretrained=False, **kwargs):
     _ = kwargs.pop("num_classes")
     model = VisionTransformerForMaskedImageModeling(
         patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), vocab_size=8192, **kwargs)
+    model.default_cfg = _cfg()
+    if pretrained:
+        checkpoint = torch.load(
+            kwargs["init_ckpt"], map_location="cpu"
+        )
+        model.load_state_dict(checkpoint["model"])
+    return model
+
+@register_model
+def beit_large_patch16_512_8k_vocab(pretrained=False, **kwargs):
+    _ = kwargs.pop("num_classes")
+    model = VisionTransformerForMaskedImageModeling(
+        img_size=512, patch_size=16, embed_dim=1024, depth=24, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), vocab_size=8192, **kwargs)
     model.default_cfg = _cfg()
     if pretrained:

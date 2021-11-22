@@ -1,7 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import cv2 as cv
 import torch
+
+import colorsys
+
 
 from torch.utils.data import Dataset
 from PIL import Image
@@ -381,8 +385,31 @@ def plot_batch(images, labels, count):
         if idx + 1 == count:
             break
 
+def rgb_to_hsv(img):
+    img = img/255.0
+    new_img = np.zeros((512, 512, 3), dtype=np.float32)
+    
+    for yi, y in enumerate(img):
+        for xi, x in enumerate(y):
+            r, g, b = x[0], x[1], x[2]
+            h, s, l = colorsys.rgb_to_hsv(r, g, b)
+            new_img[yi, xi] = [h, s, l]
 
-def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, label_path, tilesize):
+    return new_img
+
+def rgb_to_hls(img):
+    img = img/255.0
+    new_img = np.zeros((512, 512, 3), dtype=np.float32)
+    
+    for yi, y in enumerate(img):
+        for xi, x in enumerate(y):
+            r, g, b = x[0], x[1], x[2]
+            h, s, l = colorsys.rgb_to_hls(r, g, b)
+            new_img[yi, xi] = [h, s, l]
+
+    return new_img
+
+def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, label_path, tilesize, hls=False, hsv=False):
     print("Creating images and labels with tilesize", tilesize, "at", "datasets/" + dataset_name)
     
     main_dir = "datasets"
@@ -405,8 +432,8 @@ def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, 
     
     datatype_img_dir, datatype_ann_dir = os.path.join(img_dir, dataset_type), os.path.join(ann_dir, dataset_type)
 
-    if not os.path.exists(datatype_img_dir):
-        os.mkdir(datatype_img_dir)
+    if not os.path.exists(datatype_ann_dir):
+        os.mkdir(datatype_ann_dir)
     
     if not os.path.exists(datatype_ann_dir):
         os.mkdir(datatype_ann_dir)
@@ -419,26 +446,44 @@ def create_image_tiles_for_custom_dataset(dataset_name, dataset_type, img_path, 
     
     print("All images and labels has matching names")
 
-    for img, label in zip(img_files, label_files):
+    for _, (img, label) in tqdm(enumerate(zip(img_files, label_files)), total=len(img_files)):
         if cv.imread(img).shape[0] != tilesize[0] and cv.imread(img).shape[1] != tilesize[1]:
             img_tiles, label_tiles = get_image_patches(cv.imread(img), cv.imread(label), tilesize)
             for i, (img_tile, label_tile) in enumerate(zip(img_tiles, label_tiles)):
                 cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "_" + str(i) + "." + img.split("/")[-1].split(".")[1]), img_tile)
                 cv.imwrite(os.path.join(datatype_ann_dir, label.split("/")[-1].split(".")[0] + "_" + str(i) + "." + label.split("/")[-1].split(".")[1]), label_tile)
         else:
-            cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "." + img.split("/")[-1].split(".")[1]), cv.imread(img))
-            cv.imwrite(os.path.join(datatype_ann_dir, label.split("/")[-1].split(".")[0] + "." + label.split("/")[-1].split(".")[1]), cv.imread(label))
+            if hsv:
+                cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "." + img.split("/")[-1].split(".")[1] + "f"), rgb_to_hsv(cv.imread(img)))
+            elif hls:
+                cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "." + img.split("/")[-1].split(".")[1] + "f"), rgb_to_hls(cv.imread(img)))
+            else:
+                cv.imwrite(os.path.join(datatype_img_dir, img.split("/")[-1].split(".")[0] + "." + img.split("/")[-1].split(".")[1] + "f"), cv.imread(img))
+            
+            cv.imwrite(os.path.join(datatype_ann_dir, label.split("/")[-1].split(".")[0] + "." + label.split("/")[-1].split(".")[1] + "f"), np.max(cv.imread(label), axis=2).reshape(tilesize[0], tilesize[1], 1))
 
     print("Finished writing images to:", dataset_dir)
-
-    
 
 
 if __name__ == "__main__":
 
-    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512", "train", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512))
-    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512", "test", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512))
-    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512", "val", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512))
+
+    
+    label = mpimg.imread("/home/sj/kartai/building_segmentation/datasets/kartai_ksand_manuell_224_blur_fliplr_flipud_rt/img_dir/train/342_256.tiff")
+    img = mpimg.imread("/home/sj/kartai/building_segmentation/datasets/kartai_ksand_manuell_224_blur_fliplr_flipud_rt/ann_dir/train/342_256_rt.tiff")
+
+    print(label.shape)
+    _, f = plt.subplots(1, 2)
+
+    f[0].imshow(img)
+    f[1].imshow(label)
+    plt.show()
+
+    exit()
+
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512_hls", "train", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_train/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512), hls=True)
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512_hls", "test", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_prosjekt/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512), hls=True)
+    create_image_tiles_for_custom_dataset("kartai_ksand_manuell_512_hls", "val", "/home/sj/kartai/kartAI/training_data/Ortofoto_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", "/home/sj/kartai/kartAI/training_data/Bygg_ksand_manuell_valid/25832_410000.0_6420000.0_100.0_100.0/512", (512, 512), hls=True)
 
     exit()
 
